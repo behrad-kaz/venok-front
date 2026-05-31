@@ -39,7 +39,6 @@ const managerMenuItems = [
   { id: "dashboard", title: "داشبورد", icon: LayoutDashboard, href: "/dashboard" },
   { id: "requests", title: "درخواست‌ها", icon: FileText, href: "/dashboard/requests" },
   { id: "conversations", title: "گفت‌وگوها", icon: MessageCircle, href: "/dashboard/conversations" },
-  { id: "departments", title: "دپارتمان‌ها", icon: Building2, href: "/dashboard/departments" },
   { id: "members", title: "اعضا", icon: Users, href: "/dashboard/members" },
   { id: "reports", title: "گزارش‌ها", icon: FileText, href: "/dashboard/reports" },
 ];

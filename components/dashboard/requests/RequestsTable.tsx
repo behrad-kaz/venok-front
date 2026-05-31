@@ -72,6 +72,11 @@ const getManagerDepartment = (): string => {
   return "حسابداری";
 };
 
+// نام کارمند جاری (در حالت واقعی از احراز هویت می‌آید)
+const getCurrentEmployee = (): string => {
+  return "امیر حسینی";
+};
+
 const generateTickets = (role?: string): Ticket[] => {
   const customers = [
     { name: "احمد رضایی", phone: "09123456789" },
@@ -103,6 +108,7 @@ const generateTickets = (role?: string): Ticket[] => {
 
   const tickets: Ticket[] = [];
   const managerDepartment = role === "مدیر" ? getManagerDepartment() : null;
+  const currentEmployee = role === "کارمند" ? getCurrentEmployee() : null;
   
   let deptStatusCounter: Record<string, number> = {
     "حسابداری": 0,
@@ -113,14 +119,18 @@ const generateTickets = (role?: string): Ticket[] => {
   
   for (let i = 1; i <= 50; i++) {
     const department = departments[i % departments.length];
+    const assignee = assignees[i % assignees.length];
     
+    // فیلتر بر اساس نقش
     if (role === "مدیر" && department !== managerDepartment) {
+      continue;
+    }
+    if (role === "کارمند" && assignee !== currentEmployee) {
       continue;
     }
     
     const customer = customers[i % customers.length];
     const subject = subjects[i % subjects.length];
-    const assignee = assignees[i % assignees.length];
     const statusIndex = deptStatusCounter[department] % statuses.length;
     const statusObj = statuses[statusIndex];
     
@@ -200,7 +210,6 @@ export default function RequestsTable({
     setTickets(generatedTickets);
   }, [selectedRole]);
 
-  // فیلتر پایه (بدون فیلتر وضعیت)
   const filterBaseTickets = useCallback(() => {
     let filtered = [...tickets];
 
@@ -225,7 +234,6 @@ export default function RequestsTable({
     return filtered;
   }, [tickets, searchQuery, departmentFilter, timeRangeFilter]);
 
-  // اعمال فیلتر وضعیت برای نمایش
   const applyStatusFilter = useCallback((baseFiltered: Ticket[]) => {
     if (statusFilter !== "all") {
       return baseFiltered.filter((ticket) => ticket.status === statusFilter);
@@ -233,7 +241,6 @@ export default function RequestsTable({
     return baseFiltered;
   }, [statusFilter]);
 
-  // محاسبه آمار از تیکت‌های پایه
   const calculateStats = useCallback((baseFiltered: Ticket[]) => {
     return {
       all: baseFiltered.length,
@@ -246,14 +253,10 @@ export default function RequestsTable({
 
   useEffect(() => {
     const baseFiltered = filterBaseTickets();
-    
-    // ارسال آمار به والد (بدون فیلتر وضعیت)
     const stats = calculateStats(baseFiltered);
     if (onTicketsChange) {
       onTicketsChange(stats);
     }
-    
-    // اعمال فیلتر وضعیت برای نمایش در جدول
     const statusFiltered = applyStatusFilter(baseFiltered);
     setFilteredTickets(statusFiltered);
     setCurrentPage(1);

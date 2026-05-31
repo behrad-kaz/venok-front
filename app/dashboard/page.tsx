@@ -10,6 +10,7 @@ import DepartmentPerformance from "@/components/dashboard/DepartmentPerformance"
 import RecentActivities from "@/components/dashboard/RecentActivities";
 import QuickAccess from "@/components/dashboard/QuickAccess";
 import DepartmentDashboard from "@/components/dashboard/DepartmentDashboard";
+import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 import { useRoleStore } from "@/stores/useRoleStore";
 
 export default function DashboardPage() {
@@ -24,7 +25,6 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // در زمان SSR و قبل از load شدن، یک placeholder نمایش بده
   if (!isClient) {
     return (
       <DashboardLayout>
@@ -44,18 +44,23 @@ export default function DashboardPage() {
     );
   }
 
-  // نمایش داشبورد عادی برای مدیر کل و کارمند
+  // نمایش داشبورد مخصوص کارمند
+  if (role === "کارمند") {
+    return (
+      <DashboardLayout>
+        <EmployeeDashboard />
+      </DashboardLayout>
+    );
+  }
+
+  // نمایش داشبورد عادی برای مدیر کل
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex sm:flex-row items-center gap-4">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-bold text-white">
-              {role === "مدیر کل" ? "داشبورد مدیریت" : "داشبورد کارمند"}
-            </h1>
-            <p className="text-gray-400 text-sm mt-1">
-              {role === "مدیر کل" ? "نمای کلی عملکرد پلتفرم" : "تیکت‌های اختصاص یافته به شما"}
-            </p>
+            <h1 className="text-2xl font-bold text-white">داشبورد مدیریت</h1>
+            <p className="text-gray-400 text-sm mt-1">نمای کلی عملکرد پلتفرم</p>
           </div>
           <div className="flex items-center gap-2 mt-1 bg-[#1d4132] border border-[#59D8C3]/40 rounded-2xl px-2 py-1">
             <span className="text-xs text-[#59D8C3] font-medium">{role}</span>
@@ -70,16 +75,14 @@ export default function DashboardPage() {
           </div>
           <div>
             <OnlineMembers selectedRole={role} />
-            {role === "مدیر کل" && <DepartmentPerformance selectedRole={role} />}
+            <DepartmentPerformance selectedRole={role} />
           </div>
         </div>
 
-        {role === "مدیر کل" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <RecentActivities selectedRole={role} />
-            <QuickAccess selectedRole={role} />
-          </div>
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <RecentActivities selectedRole={role} />
+          <QuickAccess selectedRole={role} />
+        </div>
       </div>
     </DashboardLayout>
   );

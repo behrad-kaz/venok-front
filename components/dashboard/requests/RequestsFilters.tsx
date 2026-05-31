@@ -133,42 +133,44 @@ export default function RequestsFilters({
           )}
         </div>
 
-        {/* فیلتر دپارتمان */}
-        <div className="relative">
-          <button
-            onClick={() => setIsDeptMenuOpen(!isDeptMenuOpen)}
-            className="flex items-center gap-2 bg-[#12251F] border border-[#59D8C3]/20 rounded-lg px-4 py-2.5 text-sm text-white hover:border-[#59D8C3] transition-colors"
-          >
-            <Filter className="w-4 h-4 text-[#59D8C3]" />
-            <span className="max-w-[120px] truncate">
-              {departments.find((d) => d.id === selectedDepartment)?.label}
-            </span>
-            <ChevronDown
-              className={`w-4 h-4 transition-transform ${isDeptMenuOpen ? "rotate-180" : ""}`}
-            />
-          </button>
+        {/* فیلتر دپارتمان - فقط برای نقش‌های غیر کارمند نمایش داده شود */}
+        {selectedRole !== "کارمند" && (
+          <div className="relative">
+            <button
+              onClick={() => setIsDeptMenuOpen(!isDeptMenuOpen)}
+              className="flex items-center gap-2 bg-[#12251F] border border-[#59D8C3]/20 rounded-lg px-4 py-2.5 text-sm text-white hover:border-[#59D8C3] transition-colors"
+            >
+              <Filter className="w-4 h-4 text-[#59D8C3]" />
+              <span className="max-w-[120px] truncate">
+                {departments.find((d) => d.id === selectedDepartment)?.label}
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${isDeptMenuOpen ? "rotate-180" : ""}`}
+              />
+            </button>
 
-          {isDeptMenuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-48 bg-[#0D1B17] border border-[#59D8C3]/20 rounded-lg overflow-hidden shadow-xl z-50">
-              {departments.map((dept) => (
-                <button
-                  key={dept.id}
-                  onClick={() => {
-                    onDepartmentChange(dept.id);
-                    setIsDeptMenuOpen(false);
-                  }}
-                  className={`w-full text-right px-4 py-2 text-sm transition-colors ${
-                    selectedDepartment === dept.id
-                      ? "bg-gradient-to-r from-[#59D8C3]/20 to-[#5BE0A8]/20 text-[#59D8C3]"
-                      : "text-gray-300 hover:bg-[#12251F]"
-                  }`}
-                >
-                  {dept.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+            {isDeptMenuOpen && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-[#0D1B17] border border-[#59D8C3]/20 rounded-lg overflow-hidden shadow-xl z-50">
+                {departments.map((dept) => (
+                  <button
+                    key={dept.id}
+                    onClick={() => {
+                      onDepartmentChange(dept.id);
+                      setIsDeptMenuOpen(false);
+                    }}
+                    className={`w-full text-right px-4 py-2 text-sm transition-colors ${
+                      selectedDepartment === dept.id
+                        ? "bg-gradient-to-r from-[#59D8C3]/20 to-[#5BE0A8]/20 text-[#59D8C3]"
+                        : "text-gray-300 hover:bg-[#12251F]"
+                    }`}
+                  >
+                    {dept.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* دکمه‌های فیلتر وضعیت */}

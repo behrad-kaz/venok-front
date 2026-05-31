@@ -13,8 +13,20 @@ import ChangePasswordModal from "@/components/dashboard/members/ChangePasswordMo
 import DeactivateMemberModal from "@/components/dashboard/members/DeactivateMemberModal";
 import DeleteMemberModal from "@/components/dashboard/members/DeleteMemberModal";
 import { Member } from "@/components/dashboard/members/types";
+import { useRoleStore } from "@/stores/useRoleStore";
+import RoleGuard from "@/components/dashboard/RoleGuard";
 
-const membersData: Member[] = [
+// دپارتمان مدیران (در حالت واقعی از API می‌آید)
+const getManagerDepartment = (role: string, name: string): string => {
+  // برای نمونه، فرض می‌کنیم سارا محمدی مدیر حسابداری است
+  if (name === "سارا محمدی") return "حسابداری";
+  if (name === "علی احمدی") return "سفرهای داخلی";
+  if (name === "نیلوفر کریمی") return "سفرهای خارجی";
+  if (name === "رضا نادری") return "پشتیبانی فنی";
+  return "حسابداری";
+};
+
+const allMembersData: Member[] = [
   { id: 1, name: "مریم رضایی", username: "maryam.rezaei", role: "مدیر کل", department: "همه دپارتمان‌ها", status: "online", tickets: 0, lastActivity: "همین الان" },
   { id: 2, name: "سارا محمدی", username: "sara.m", role: "مدیر دپارتمان", department: "حسابداری", status: "online", tickets: 4, lastActivity: "۵ دقیقه پیش" },
   { id: 3, name: "علی احمدی", username: "ali.a", role: "مدیر دپارتمان", department: "سفرهای داخلی", status: "offline", tickets: 6, lastActivity: "۲ ساعت پیش" },
@@ -22,6 +34,8 @@ const membersData: Member[] = [
   { id: 5, name: "امیر حسینی", username: "amir.h", role: "کارمند پشتیبانی", department: "حسابداری", status: "online", tickets: 5, lastActivity: "همین الان" },
   { id: 6, name: "الهام کاظمی", username: "elham.k", role: "کارمند پشتیبانی", department: "سفرهای داخلی", status: "offline", tickets: 3, lastActivity: "۱ ساعت پیش" },
   { id: 7, name: "رضا نادری", username: "reza.n", role: "مدیر دپارتمان", department: "پشتیبانی فنی", status: "online", tickets: 2, lastActivity: "۲۰ دقیقه پیش" },
+  { id: 8, name: "احمد کریمی", username: "ahmad.k", role: "کارمند پشتیبانی", department: "حسابداری", status: "online", tickets: 2, lastActivity: "۳۰ دقیقه پیش" },
+  { id: 9, name: "زهرا محمدی", username: "zahra.m", role: "کارمند پشتیبانی", department: "حسابداری", status: "offline", tickets: 1, lastActivity: "۳ ساعت پیش" },
 ];
 
 const getInitials = (name: string) => {
@@ -31,7 +45,10 @@ const getInitials = (name: string) => {
 };
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<Member[]>(membersData);
+  const { role } = useRoleStore();
+  const [userName, setUserName] = useState("سارا محمدی"); // در حالت واقعی از احراز هویت می‌آید
+  
+  const [members, setMembers] = useState<Member[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -44,7 +61,7 @@ export default function MembersPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
-  // فرم‌ها با اضافه کردن status
+  // فرم‌ها
   const [newMember, setNewMember] = useState({ 
     name: "", 
     username: "", 
@@ -65,6 +82,21 @@ export default function MembersPage() {
   
   const [passwordData, setPasswordData] = useState({ newPassword: "", confirmPassword: "" });
 
+  // فیلتر کردن اعضا بر اساس نقش و دپارتمان
+  useEffect(() => {
+    let filteredMembers = [...allMembersData];
+    
+    if (role === "مدیر") {
+      const managerDepartment = getManagerDepartment(role, userName);
+      // مدیر فقط اعضای دپارتمان خود را می‌بیند
+      filteredMembers = filteredMembers.filter(m => 
+        m.department === managerDepartment || m.role === "مدیر کل"
+      );
+    }
+    
+    setMembers(filteredMembers);
+  }, [role, userName]);
+
   const filteredMembers = members.filter((m) => {
     const matchesSearch = searchQuery === "" || m.name.includes(searchQuery) || m.username.includes(searchQuery);
     const matchesRole = roleFilter === "all" || m.role === roleFilter;
@@ -75,12 +107,15 @@ export default function MembersPage() {
   const handleAddMember = () => {
     if (!newMember.name || !newMember.username || !newMember.password || !newMember.department || !newMember.role) return;
     if (newMember.password !== newMember.confirmPassword) { alert("رمز عبور مطابقت ندارد"); return; }
+    
+    const managerDepartment = role === "مدیر" ? getManagerDepartment(role, userName) : newMember.department;
+    
     setMembers([...members, { 
       id: members.length + 1, 
       name: newMember.name, 
       username: newMember.username, 
       role: newMember.role as any, 
-      department: newMember.department, 
+      department: role === "مدیر" ? managerDepartment : newMember.department, 
       status: newMember.status === "active" ? "online" : "offline", 
       tickets: 0, 
       lastActivity: "همین الان" 
@@ -149,7 +184,25 @@ export default function MembersPage() {
     setIsDeleteModalOpen(true); 
   };
 
+  // عنوان صفحه بر اساس نقش
+  const getPageTitle = () => {
+    if (role === "مدیر") {
+      const department = getManagerDepartment(role, userName);
+      return {
+        title: "مدیریت اعضا",
+        description: `اعضای دپارتمان ${department}`,
+      };
+    }
+    return {
+      title: "مدیریت اعضا",
+      description: "مدیریت تمامی اعضای سازمان",
+    };
+  };
+
+  const pageTitle = getPageTitle();
+
   return (
+     <RoleGuard allowedRoles={["مدیر کل", "مدیر"]}>
     <DashboardLayout>
       <div className="max-w-7xl mx-auto">
         <div className="relative mb-6">
@@ -158,20 +211,69 @@ export default function MembersPage() {
           </Link>
           <div className="pt-10">
             <div className="flex items-center justify-between">
-              <div><h1 className="text-2xl font-bold text-white">مدیریت اعضا</h1><p className="text-gray-400 text-sm mt-0.5">{filteredMembers.length} عضو</p></div>
-              <button onClick={() => setIsAddModalOpen(true)} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] font-medium hover:shadow-lg transition-all duration-300 flex items-center gap-2 text-sm">+ افزودن عضو</button>
+              <div>
+                <h1 className="text-2xl font-bold text-white">{pageTitle.title}</h1>
+                <p className="text-gray-400 text-sm mt-0.5">{pageTitle.description} • {filteredMembers.length} عضو</p>
+              </div>
+              {role !== "مدیر" && (
+                <button onClick={() => setIsAddModalOpen(true)} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] font-medium hover:shadow-lg transition-all duration-300 flex items-center gap-2 text-sm">+ افزودن عضو</button>
+              )}
             </div>
-            <MembersFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} roleFilter={roleFilter} onRoleChange={setRoleFilter} statusFilter={statusFilter} onStatusChange={setStatusFilter} />
-            <MembersTable members={filteredMembers} onEdit={openEditModal} onPassword={openPasswordModal} onDeactivate={openDeactivateModal} onDelete={openDeleteModal} getInitials={getInitials} />
-            <div className="lg:hidden space-y-3 mt-6">{filteredMembers.map((m) => (<MemberCard key={m.id} member={m} onEdit={openEditModal} onPassword={openPasswordModal} onDelete={openDeleteModal} getInitials={getInitials} />))}</div>
+
+            {/* هشدار برای نقش مدیر */}
+            {role === "مدیر" && (
+              <div className="flex items-center gap-2 px-4 py-2.5 mt-4 rounded-xl bg-[#59D8C3]/10 border border-[#59D8C3]/20 text-xs text-gray-400">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#59d8c3" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                شما فقط اعضای دپارتمان خودتان را می‌بینید.
+              </div>
+            )}
+
+            <MembersFilters 
+              searchQuery={searchQuery} 
+              onSearchChange={setSearchQuery} 
+              roleFilter={roleFilter} 
+              onRoleChange={setRoleFilter} 
+              statusFilter={statusFilter} 
+              onStatusChange={setStatusFilter} 
+            />
+            
+            <MembersTable 
+              members={filteredMembers} 
+              onEdit={openEditModal} 
+              onPassword={openPasswordModal} 
+              onDeactivate={openDeactivateModal} 
+              onDelete={openDeleteModal} 
+              getInitials={getInitials} 
+            />
+            
+            <div className="lg:hidden space-y-3 mt-6">
+              {filteredMembers.map((m) => (
+                <MemberCard 
+                  key={m.id} 
+                  member={m} 
+                  onEdit={openEditModal} 
+                  onPassword={openPasswordModal} 
+                  onDelete={openDeleteModal} 
+                  getInitials={getInitials} 
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
-      <AddMemberModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSubmit={handleAddMember} formData={newMember} setFormData={setNewMember} />
+      
+      {role !== "مدیر" && (
+        <AddMemberModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSubmit={handleAddMember} formData={newMember} setFormData={setNewMember} />
+      )}
       <EditMemberModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSubmit={handleEditMember} formData={editMember} setFormData={setEditMember} memberName={selectedMember?.name} />
       <ChangePasswordModal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} onSubmit={handleChangePassword} formData={passwordData} setFormData={setPasswordData} memberName={selectedMember?.name} />
       <DeactivateMemberModal isOpen={isDeactivateModalOpen} onClose={() => setIsDeactivateModalOpen(false)} onConfirm={handleDeactivate} memberName={selectedMember?.name} />
       <DeleteMemberModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDelete} memberName={selectedMember?.name} />
     </DashboardLayout>
+    </RoleGuard>
   );
 }

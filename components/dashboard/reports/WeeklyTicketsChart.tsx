@@ -6,23 +6,51 @@ import { useState } from "react";
 
 interface WeeklyTicketsChartProps {
   dateRange: "today" | "week" | "month" | "quarter";
+  isManager?: boolean;
+  managerDepartment?: string;
 }
 
-// داده‌های ثابت برای یک هفته (نمایشی)
-const weeklyData = [32, 28, 35, 30, 26, 38, 22];
+// داده‌های عمومی
+const weeklyDataGlobal = [32, 28, 35, 30, 26, 38, 22];
+
+// داده‌های دپارتمان حسابداری
+const weeklyDataAccounting = [19, 15, 22, 18, 14, 25, 12];
+
+// داده‌های دپارتمان سفرهای داخلی
+const weeklyDataDomestic = [28, 32, 30, 35, 27, 40, 20];
+
+// داده‌های دپارتمان سفرهای خارجی
+const weeklyDataInternational = [24, 20, 28, 22, 18, 30, 16];
+
+// داده‌های دپارتمان پشتیبانی فنی
+const weeklyDataTechnical = [12, 10, 14, 11, 9, 15, 8];
+
+const getWeeklyData = (isManager: boolean, department?: string) => {
+  if (!isManager) return weeklyDataGlobal;
+  
+  switch (department) {
+    case "حسابداری":
+      return weeklyDataAccounting;
+    case "سفرهای داخلی":
+      return weeklyDataDomestic;
+    case "سفرهای خارجی":
+      return weeklyDataInternational;
+    case "پشتیبانی فنی":
+      return weeklyDataTechnical;
+    default:
+      return weeklyDataAccounting;
+  }
+};
 
 const days = ["شنبه", "یک‌شنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"];
 
-export default function WeeklyTicketsChart({ dateRange }: WeeklyTicketsChartProps) {
-  const data = weeklyData;
+export default function WeeklyTicketsChart({ dateRange, isManager, managerDepartment }: WeeklyTicketsChartProps) {
+  const data = getWeeklyData(isManager || false, managerDepartment);
   const [hoveredBar, setHoveredBar] = useState<{ index: number; value: number; day: string } | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-  // محاسبه حداکثر مقدار واقعی داده‌ها
   const maxDataValue = Math.max(...data);
-  // محاسبه حداکثر مقدار برای محور Y (بر اساس داده‌ها، به سمت بالا گرد می‌شود)
   const maxYAxis = Math.ceil(maxDataValue / 8) * 8;
-  // تولید مقادیر محور Y بر اساس حداکثر
   const yAxisValues = [];
   for (let i = 0; i <= maxYAxis; i += 8) {
     yAxisValues.push(i);
@@ -44,13 +72,12 @@ export default function WeeklyTicketsChart({ dateRange }: WeeklyTicketsChartProp
       transition={{ delay: 0.3 }}
       className="rounded-2xl bg-[#0D1B17] border border-[#59D8C3]/20 p-5 pb-18"
     >
-      <h3 className="text-sm font-semibold text-white mb-5">تیکت‌های هفتگی</h3>
+      <h3 className="text-sm font-semibold text-white mb-5">
+        {isManager ? `تیکت‌های هفتگی - ${managerDepartment}` : "تیکت‌های هفتگی"}
+      </h3>
 
-      {/* نمودار با استفاده از Grid layout */}
       <div className="grid grid-cols-[1fr_40px] gap-2">
-        {/* ستون نمودار */}
         <div className="relative h-[200px]">
-          {/* خطوط گرید افقی */}
           <div className="absolute inset-0">
             {yAxisValues.map((val) => (
               <div
@@ -61,7 +88,6 @@ export default function WeeklyTicketsChart({ dateRange }: WeeklyTicketsChartProp
             ))}
           </div>
 
-          {/* نوارهای نمودار */}
           <div className="absolute inset-0 flex items-end justify-between gap-10">
             {data.map((value, index) => {
               const barHeight = getBarHeight(value);
@@ -88,7 +114,6 @@ export default function WeeklyTicketsChart({ dateRange }: WeeklyTicketsChartProp
           </div>
         </div>
 
-        {/* ستون اعداد محور Y (سمت چپ) */}
         <div className="flex flex-col justify-between h-[200px] text-[11px] text-gray-500 text-left">
           {[...yAxisValues].reverse().map((val) => (
             <div key={val} className="leading-none" style={{ marginTop: val === maxYAxis ? "-4px" : "auto" }}>
@@ -98,7 +123,6 @@ export default function WeeklyTicketsChart({ dateRange }: WeeklyTicketsChartProp
         </div>
       </div>
 
-      {/* تولتیپ */}
       {hoveredBar && (
         <div
           className="fixed bg-[#0D1B17] border border-[#59D8C3]/30 rounded-lg px-3 py-1.5 shadow-lg z-50"

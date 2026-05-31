@@ -11,6 +11,7 @@ import SmsSettings from "@/components/dashboard/settings/SmsSettings";
 import AllowedDomains from "@/components/dashboard/settings/AllowedDomains";
 import SecuritySettings from "@/components/dashboard/settings/SecuritySettings";
 import AccessSummary from "@/components/dashboard/settings/AccessSummary";
+import RoleGuard from "@/components/dashboard/RoleGuard";
 
 export default function SettingsPage() {
   const [companyData, setCompanyData] = useState({
@@ -36,6 +37,7 @@ export default function SettingsPage() {
   const [isWidgetActive, setIsWidgetActive] = useState(true);
 
   return (
+    <RoleGuard allowedRoles={["مدیر کل"]}>
     <DashboardLayout>
       <div className="max-w-3xl mx-auto space-y-6">
         {/* دکمه صفحه اصلی */}
@@ -86,5 +88,6 @@ export default function SettingsPage() {
         </motion.div>
       </div>
     </DashboardLayout>
+    </RoleGuard>
   );
 }

@@ -89,7 +89,7 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
   if (!isDashboardPage) return null;
 
   return (
-    <header className="bg-[#0D1B17] border-b border-[#59D8C3]/20 sticky top-0 z-40 backdrop-blur-sm">
+    <header className="bg-[#0D1B17] border-b border-[#59D8C3]/20 sticky top-0 z-40 mb-2 backdrop-blur-sm">
       <div className="px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">

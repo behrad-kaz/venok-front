@@ -3,6 +3,7 @@
 
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
 
 interface RecentTicketsProps {
   selectedRole?: string;
@@ -54,6 +55,15 @@ const recentTickets = [
     userName: "کامران کریمی",
     department: "سفرهای خارجی",
   },
+    {
+    id: "1048#",
+    title: "پیگیری تاریخ پرواز خارجی",
+    time: "18:30 روز",
+    status: "پاسخ داده شده",
+    statusType: "answered",
+    userName: "کامشسان کریمی",
+    department: "سفرهای خارجی",
+  },
 ];
 
 const getStatusColor = (statusType: string) => {
@@ -83,6 +93,9 @@ const getStatusIcon = (statusType: string) => {
 };
 
 export default function RecentTickets({ selectedRole }: RecentTicketsProps) {
+  // فقط 5 تا از آخرین درخواست‌ها را نمایش بده
+  const displayTickets = recentTickets.slice(0, 5);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -93,15 +106,18 @@ export default function RecentTickets({ selectedRole }: RecentTicketsProps) {
       {/* هدر */}
       <div className="flex items-center justify-between p-5">
         <h3 className="text-lg font-semibold text-white">آخرین درخواست‌ها</h3>
-        <button className="text-[#59D8C3] text-sm hover:text-[#5BE0A8] transition-colors flex items-center gap-1">
+        <Link
+          href="/dashboard/requests"
+          className="text-[#59D8C3] text-sm hover:text-[#5BE0A8] transition-colors flex items-center gap-1"
+        >
           <span>مشاهده همه</span>
           <ChevronLeft className="w-4 h-4" />
-        </button>
+        </Link>
       </div>
 
       {/* لیست درخواست‌ها */}
       <div className="p-4 space-y-3">
-        {recentTickets.map((ticket, index) => (
+        {displayTickets.map((ticket, index) => (
           <motion.div
             key={ticket.id}
             initial={{ opacity: 0, x: -20 }}

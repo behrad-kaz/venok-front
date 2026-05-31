@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import DepartmentsList from "@/components/dashboard/departments/DepartmentsList";
 import AddDepartmentModal from "@/components/dashboard/departments/AddDepartmentModal";
+import RoleGuard from "@/components/dashboard/RoleGuard";
 import Link from "next/link";
 
 export default function DepartmentsPage() {
@@ -20,6 +21,7 @@ export default function DepartmentsPage() {
   }, []);
 
   return (
+    <RoleGuard allowedRoles={["مدیر کل"]}>
     <DashboardLayout>
       <div className="space-y-6">
         {/* عنوان صفحه */}
@@ -51,5 +53,6 @@ export default function DepartmentsPage() {
         />
       </div>
     </DashboardLayout>
+    </RoleGuard>
   );
 }

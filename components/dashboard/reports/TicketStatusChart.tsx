@@ -1,3 +1,4 @@
+// components/dashboard/reports/TicketStatusChart.tsx
 "use client";
 
 import { motion } from "framer-motion";
@@ -5,13 +6,45 @@ import { useState } from "react";
 
 interface TicketStatusChartProps {
   dateRange: "today" | "week" | "month" | "quarter";
+  isManager?: boolean;
+  managerDepartment?: string;
 }
 
-const statusData = {
+// داده‌های عمومی
+const statusDataGlobal = {
   today: { unanswered: 2, pending: 4, answered: 3, closed: 8 },
   week: { unanswered: 9, pending: 16, answered: 24, closed: 62 },
   month: { unanswered: 16, pending: 24, answered: 31, closed: 128 },
   quarter: { unanswered: 42, pending: 58, answered: 89, closed: 380 },
+};
+
+// داده‌های دپارتمان حسابداری
+const statusDataAccounting = {
+  today: { unanswered: 3, pending: 5, answered: 2, closed: 6 },
+  week: { unanswered: 14, pending: 22, answered: 12, closed: 38 },
+  month: { unanswered: 32, pending: 48, answered: 28, closed: 86 },
+  quarter: { unanswered: 85, pending: 132, answered: 76, closed: 245 },
+};
+
+// داده‌های دپارتمان سفرهای داخلی
+const statusDataDomestic = {
+  today: { unanswered: 4, pending: 6, answered: 3, closed: 8 },
+  week: { unanswered: 18, pending: 28, answered: 14, closed: 42 },
+  month: { unanswered: 42, pending: 58, answered: 32, closed: 98 },
+  quarter: { unanswered: 110, pending: 160, answered: 88, closed: 280 },
+};
+
+const getStatusData = (isManager: boolean, department?: string, dateRange?: string) => {
+  if (!isManager) return statusDataGlobal[dateRange as keyof typeof statusDataGlobal];
+  
+  switch (department) {
+    case "حسابداری":
+      return statusDataAccounting[dateRange as keyof typeof statusDataAccounting];
+    case "سفرهای داخلی":
+      return statusDataDomestic[dateRange as keyof typeof statusDataDomestic];
+    default:
+      return statusDataGlobal[dateRange as keyof typeof statusDataGlobal];
+  }
 };
 
 const statusColors = {
@@ -21,9 +54,9 @@ const statusColors = {
   closed: { bg: "#6F8880", label: "بسته شده" },
 };
 
-export default function TicketStatusChart({ dateRange }: TicketStatusChartProps) {
+export default function TicketStatusChart({ dateRange, isManager, managerDepartment }: TicketStatusChartProps) {
   const [hoveredSector, setHoveredSector] = useState<any>(null);
-  const data = statusData[dateRange];
+  const data = getStatusData(isManager || false, managerDepartment, dateRange);
   const total = Object.values(data).reduce((a, b) => a + b, 0);
 
   let currentAngle = 0;
@@ -75,7 +108,6 @@ export default function TicketStatusChart({ dateRange }: TicketStatusChartProps)
             <circle cx="50" cy="50" r="28" fill="#0D1B17" />
           </svg>
 
-          {/* Tooltip Overlay */}
           {hoveredSector && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="bg-[#06110F]/90 backdrop-blur-sm border border-[#59D8C3]/50 px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in zoom-in duration-200">

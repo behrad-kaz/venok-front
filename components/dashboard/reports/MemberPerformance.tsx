@@ -5,9 +5,12 @@ import { motion } from "framer-motion";
 
 interface MemberPerformanceProps {
   dateRange: "today" | "week" | "month" | "quarter";
+  isManager?: boolean;
+  managerDepartment?: string;
 }
 
-const memberData = {
+// داده‌های عمومی
+const memberDataGlobal = {
   today: [
     { name: "امیر حسینی", closed: 5, avgTime: 4, percentage: 85 },
     { name: "الهام کاظمی", closed: 3, avgTime: 6, percentage: 75 },
@@ -38,14 +41,49 @@ const memberData = {
   ],
 };
 
+// داده‌های دپارتمان حسابداری
+const memberDataAccounting = {
+  today: [
+    { name: "امیر حسینی", closed: 4, avgTime: 5, percentage: 80 },
+    { name: "احمد کریمی", closed: 2, avgTime: 6, percentage: 70 },
+    { name: "زهرا محمدی", closed: 1, avgTime: 8, percentage: 60 },
+  ],
+  week: [
+    { name: "امیر حسینی", closed: 22, avgTime: 7, percentage: 88 },
+    { name: "احمد کریمی", closed: 14, avgTime: 9, percentage: 82 },
+    { name: "زهرا محمدی", closed: 8, avgTime: 11, percentage: 75 },
+  ],
+  month: [
+    { name: "امیر حسینی", closed: 86, avgTime: 8, percentage: 90 },
+    { name: "احمد کریمی", closed: 52, avgTime: 10, percentage: 85 },
+    { name: "زهرا محمدی", closed: 34, avgTime: 12, percentage: 78 },
+  ],
+  quarter: [
+    { name: "امیر حسینی", closed: 245, avgTime: 9, percentage: 88 },
+    { name: "احمد کریمی", closed: 156, avgTime: 11, percentage: 82 },
+    { name: "زهرا محمدی", closed: 98, avgTime: 13, percentage: 76 },
+  ],
+};
+
+const getMemberData = (isManager: boolean, department?: string, dateRange?: string) => {
+  if (!isManager) return memberDataGlobal[dateRange as keyof typeof memberDataGlobal];
+  
+  switch (department) {
+    case "حسابداری":
+      return memberDataAccounting[dateRange as keyof typeof memberDataAccounting];
+    default:
+      return memberDataGlobal[dateRange as keyof typeof memberDataGlobal];
+  }
+};
+
 const getInitials = (name: string) => {
   const names = name.split(" ");
   if (names.length >= 2) return `${names[0].charAt(0)}${names[1].charAt(0)}`;
   return name.charAt(0);
 };
 
-export default function MemberPerformance({ dateRange }: MemberPerformanceProps) {
-  const data = memberData[dateRange];
+export default function MemberPerformance({ dateRange, isManager, managerDepartment }: MemberPerformanceProps) {
+  const data = getMemberData(isManager || false, managerDepartment, dateRange);
   const maxClosed = Math.max(...data.map(m => m.closed));
 
   return (
@@ -55,7 +93,9 @@ export default function MemberPerformance({ dateRange }: MemberPerformanceProps)
       transition={{ delay: 0.6 }}
       className="rounded-2xl bg-[#0D1B17] border border-[#59D8C3]/20 p-5"
     >
-      <h3 className="text-sm font-semibold text-white mb-4">عملکرد اعضا</h3>
+      <h3 className="text-sm font-semibold text-white mb-4">
+        {isManager ? `عملکرد اعضای ${managerDepartment}` : "عملکرد اعضا"}
+      </h3>
       <div className="space-y-3">
         {data.map((member, index) => {
           const percentage = (member.closed / maxClosed) * 100;

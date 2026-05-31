@@ -16,10 +16,10 @@ interface QuickAccessProps {
 }
 
 const quickAccessItems = [
-  { id: 1, title: "افزودن عضو", icon: UserPlus, href: "/dashboard/members/add" },
-  { id: 2, title: "افزودن دپارتمان", icon: Building2, href: "/dashboard/departments/add" },
+  { id: 1, title: "افزودن عضو", icon: UserPlus, href: "/dashboard/members" },
+  { id: 2, title: "افزودن دپارتمان", icon: Building2, href: "/dashboard/departments" },
   { id: 3, title: "مشاهده درخواست‌ها", icon: Eye, href: "/dashboard/requests" },
-  { id: 4, title: "تنظیمات ویجت", icon: Settings, href: "/dashboard/settings/widget" },
+  { id: 4, title: "تنظیمات ویجت", icon: Settings, href: "/dashboard/settings" },
 ];
 
 export default function QuickAccess({ selectedRole }: QuickAccessProps) {
@@ -28,7 +28,7 @@ export default function QuickAccess({ selectedRole }: QuickAccessProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.35 }}
-      className="bg-[#0D1B17] border border-[#59D8C3]/20 rounded-xl pb-10 overflow-hidden"
+      className="bg-[#0D1B17] border border-[#59D8C3]/20 rounded-xl overflow-hidden"
     >
       {/* هدر */}
       <div className="flex items-center justify-between p-5">
@@ -39,7 +39,7 @@ export default function QuickAccess({ selectedRole }: QuickAccessProps) {
       </div>
 
       {/* لیست دسترسی‌ها */}
-      <div className="p-5 grid grid-cols-2 gap-2 space-y-3">
+      <div className="p-5 grid grid-cols-2 gap-4">
         {quickAccessItems.map((item, index) => {
           const Icon = item.icon;
           return (
@@ -53,9 +53,9 @@ export default function QuickAccess({ selectedRole }: QuickAccessProps) {
                 href={item.href}
                 className="flex items-center justify-center p-4 rounded-xl bg-[#12251F] hover:bg-[#1A352B] transition-all duration-300 group border border-transparent hover:border-[#59D8C3]/30"
               >
-                <div className="py-4">
-                  <div className="w-8 h-8 mx-auto rounded-lg flex items-center justify-center">
-                    <Icon className="w-6 h-6" />
+                <div className="text-center">
+                  <div className="w-10 h-10 mx-auto rounded-xl bg-[#59D8C3]/10 flex items-center justify-center mb-2 group-hover:bg-[#59D8C3]/20 transition-colors">
+                    <Icon className="w-5 h-5 text-[#59D8C3]" />
                   </div>
                   <span className="text-white text-sm font-medium group-hover:text-[#59D8C3] transition-colors">
                     {item.title}

@@ -16,6 +16,7 @@ import {
 import EditDepartmentModal from "./EditDepartmentModal";
 import AddDepartmentModal from "./AddDepartmentModal";
 import DeactivateModal from "./DeactivateModal";
+import DeleteModal from "./DeleteModal";
 
 interface Department {
   id: number;
@@ -93,6 +94,8 @@ export default function DepartmentsList({ selectedRole }: DepartmentsListProps) 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [deactivatingDepartment, setDeactivatingDepartment] = useState<Department | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null);
 
   const handleToggleStatus = (department: Department) => {
     if (department.status === "active") {
@@ -119,10 +122,17 @@ export default function DepartmentsList({ selectedRole }: DepartmentsListProps) 
     setDeactivatingDepartment(null);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("آیا از حذف این دپارتمان مطمئن هستید؟")) {
-      setDepartments((prev) => prev.filter((dept) => dept.id !== id));
+  const handleDeleteClick = (department: Department) => {
+    setDeletingDepartment(department);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (deletingDepartment) {
+      setDepartments((prev) => prev.filter((dept) => dept.id !== deletingDepartment.id));
     }
+    setIsDeleteModalOpen(false);
+    setDeletingDepartment(null);
   };
 
   const handleEdit = (department: Department) => {
@@ -168,7 +178,7 @@ export default function DepartmentsList({ selectedRole }: DepartmentsListProps) 
                   department={dept}
                   onToggleStatus={handleToggleStatus}
                   onEdit={handleEdit}
-                  onDelete={handleDelete}
+                  onDelete={handleDeleteClick}
                   index={index}
                 />
               ))}
@@ -187,7 +197,7 @@ export default function DepartmentsList({ selectedRole }: DepartmentsListProps) 
                   department={dept}
                   onToggleStatus={handleToggleStatus}
                   onEdit={handleEdit}
-                  onDelete={handleDelete}
+                  onDelete={handleDeleteClick}
                   index={index}
                 />
               ))}
@@ -220,6 +230,16 @@ export default function DepartmentsList({ selectedRole }: DepartmentsListProps) 
         onConfirm={confirmDeactivate}
         departmentName={deactivatingDepartment?.name || ""}
       />
+
+      <DeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingDepartment(null);
+        }}
+        onConfirm={confirmDelete}
+        departmentName={deletingDepartment?.name || ""}
+      />
     </>
   );
 }
@@ -235,7 +255,7 @@ function DepartmentCard({
   department: Department;
   onToggleStatus: (dept: Department) => void;
   onEdit: (dept: Department) => void;
-  onDelete: (id: number) => void;
+  onDelete: (dept: Department) => void;
   index: number;
 }) {
   const [showDetails, setShowDetails] = useState(false);
@@ -289,7 +309,7 @@ function DepartmentCard({
             </button>
 
             <button
-              onClick={() => onDelete(department.id)}
+              onClick={() => onDelete(department)}
               className="p-2 bg-red-500/10 hover:bg-red-500/20 flex items-center gap-1 rounded-2xl transition-colors"
             >
               <Trash2 className="w-4 h-4 text-red-400" />

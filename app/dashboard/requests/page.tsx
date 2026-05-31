@@ -21,7 +21,6 @@ export default function RequestsPage() {
     closed: 0,
   });
 
-  // تابع به‌روزرسانی آمار تیکت‌ها
   const handleTicketsChange = useCallback((counts: {
     all: number;
     unanswered: number;
@@ -37,6 +36,12 @@ export default function RequestsPage() {
       return {
         title: "درخواست‌ها",
         description: "تیکت‌های دپارتمان",
+      };
+    }
+    if (role === "کارمند") {
+      return {
+        title: "درخواست‌های من",
+        description: "تیکت‌های اختصاص یافته به شما",
       };
     }
     return {
@@ -63,6 +68,17 @@ export default function RequestsPage() {
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
             شما فقط تیکت‌های دپارتمان خودتان را می‌بینید.
+          </div>
+        )}
+
+        {role === "کارمند" && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#59D8C3]/10 border border-[#59D8C3]/20 text-xs text-gray-400">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#59d8c3" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            شما فقط تیکت‌های اختصاص‌یافته به خودتان را می‌بینید.
           </div>
         )}
 
