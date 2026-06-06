@@ -68,12 +68,19 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
     setIsRoleMenuOpen(false);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userRole");
-    setIsLoggedIn(false);
-    router.push("/login");
-  };
+const handleLogout = () => {
+  localStorage.removeItem("isLoggedIn");
+  localStorage.removeItem("userRole");
+  localStorage.removeItem("userName");
+  localStorage.removeItem("hasSeenOnboarding");
+  
+  // حذف کوکی‌ها
+  document.cookie = "isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+  document.cookie = "userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+  document.cookie = "hasSeenOnboarding=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+  
+  router.push("/login");
+};
 
   const handleDashboard = () => {
     router.push("/dashboard");

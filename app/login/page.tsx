@@ -15,22 +15,53 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsLoading(true);
+ const handleLogin = (e: React.FormEvent) => {
+  e.preventDefault();
+  setError("");
+  setIsLoading(true);
 
-    setTimeout(() => {
-      if (username === "admin" && password === "123456") {
-        localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("userRole", "مدیر کل");
-        router.push("/dashboard");
-      } else {
-        setError("نام کاربری یا رمز عبور اشتباه است");
-      }
+  setTimeout(() => {
+    let role = "";
+    let name = "";
+    
+    // تشخیص نقش بر اساس نام کاربری
+    if (username === "admin" && password === "123456") {
+      role = "مدیر کل";
+      name = "مریم رضایی";
+    } else if (username === "manager.support" && password === "manager123") {
+      role = "مدیر";
+      name = "سارا محمدی";
+    } else if (username === "staff.ali" && password === "staff123") {
+      role = "کارمند";
+      name = "علی احمدی";
+    } else {
+      setError("نام کاربری یا رمز عبور اشتباه است");
       setIsLoading(false);
-    }, 800);
-  };
+      return;
+    }
+
+    // ذخیره در localStorage
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("userRole", role);
+    localStorage.setItem("userName", name);
+    
+    // اگر مدیر کل است و هنوز onboarding را ندیده، flag را false بگذار
+    if (role === "مدیر کل") {
+      const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
+      if (!hasSeenOnboarding) {
+        localStorage.setItem("hasSeenOnboarding", "false");
+      }
+    }
+    
+    // برای middleware هم کوکی ست می‌کنیم
+    document.cookie = `isLoggedIn=true; path=/; max-age=${60 * 60 * 24 * 7}`;
+    document.cookie = `userRole=${role}; path=/; max-age=${60 * 60 * 24 * 7}`;
+    document.cookie = `hasSeenOnboarding=${role === "مدیر کل" ? "false" : "true"}; path=/; max-age=${60 * 60 * 24 * 7}`;
+    
+    router.push("/dashboard");
+    setIsLoading(false);
+  }, 800);
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#193631] to-[#000000] relative overflow-hidden">

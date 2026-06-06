@@ -43,6 +43,7 @@ body {
   font-family: 'Vazirmatn', system-ui, -apple-system, sans-serif;
 }
 
+/* انیمیشن‌های موجود */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -74,6 +75,53 @@ body {
   }
 }
 
+/* انیمیشن‌های جدید برای صفحه موفقیت */
+@keyframes successPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(89, 216, 195, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(89, 216, 195, 0);
+  }
+}
+
+@keyframes checkmark {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* کلاس‌های کاربردی انیمیشن */
 .animate-fadeInUp {
   animation: fadeInUp 0.5s ease-out;
 }
@@ -84,4 +132,72 @@ body {
 
 .animate-pulse-glow {
   animation: pulseGlow 2s infinite;
+}
+
+.animate-success-pulse {
+  animation: successPulse 1.5s ease-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(89, 216, 195, 0.1), transparent);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* کلاس‌های کمکی برای RTL */
+.rtl-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.rtl-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.rtl-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(89, 216, 195, 0.3);
+  border-radius: 10px;
+}
+
+.rtl-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(89, 216, 195, 0.5);
+}
+
+/* کلاس‌های گرادیان */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #59D8C3 0%, #5BE0A8 100%);
+}
+
+.text-gradient-primary {
+  background: linear-gradient(135deg, #59D8C3 0%, #5BE0A8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* جلوه‌های شیشه‌ای (Glassmorphism) */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-effect-light {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* transition smooth */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
