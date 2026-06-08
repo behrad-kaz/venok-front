@@ -1,169 +1,196 @@
-// components/dashboard/EmployeeDashboard.tsx
 "use client";
 
-import { motion } from "framer-motion";
-import { FileText, AlertCircle, MessageCircle } from "lucide-react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useRoleStore } from "@/stores/useRoleStore";
+import { ChevronRight } from "lucide-react";
+import { myConversations } from "./employee/data";
+import { Conversation } from "./employee/types";
+import EmployeeConversationList from "./employee/EmployeeConversationList";
+import EmployeeChatHeader from "./employee/EmployeeChatHeader";
+import EmployeeChatMessages from "./employee/EmployeeChatMessages";
+import EmployeeChatInput from "./employee/EmployeeChatInput";
+import EmployeeDetailsSidebar from "./employee/EmployeeDetailsSidebar";
+import EmployeeEmptyState from "./employee/EmployeeEmptyState";
 
-interface Ticket {
-  id: string;
-  title: string;
-  customer: string;
-  time: string;
-  status: "pending" | "unanswered" | "answered" | "closed";
-  statusText: string;
-}
-
-// تیکت‌های اختصاص یافته به کارمند
-const myTickets: Ticket[] = [
-  {
-    id: "SUP-1042",
-    title: "مشکل در پرداخت",
-    customer: "رضا احمدی",
-    time: "۱۵ دقیقه پیش",
-    status: "pending",
-    statusText: "در حال پیگیری",
-  },
-  {
-    id: "SUP-1045",
-    title: "مشکل در ورود به حساب",
-    customer: "مینا صالحی",
-    time: "۲ ساعت پیش",
-    status: "unanswered",
-    statusText: "پاسخ داده نشده",
-  },
-];
-
-const getStatusBadge = (status: string, statusText: string) => {
-  const colors = {
-    pending: "bg-[#59D8C3]/10 text-[#59D8C3] border-[#59D8C3]/30",
-    unanswered: "bg-[#F2B84B]/10 text-[#F2B84B] border-[#F2B84B]/30",
-    answered: "bg-[#5BE0A8]/10 text-[#5BE0A8] border-[#5BE0A8]/30",
-    closed: "bg-gray-500/10 text-gray-400 border-gray-500/30",
-  };
-  
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border font-medium px-2.5 py-1 text-xs ${colors[status as keyof typeof colors]}`}>
-      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 bg-${status === "pending" ? "[#59D8C3]" : status === "unanswered" ? "[#F2B84B]" : status === "answered" ? "[#5BE0A8]" : "gray-400"}`} />
-      {statusText}
-    </span>
-  );
-};
+type ViewMode = "list" | "chat" | "details";
 
 export default function EmployeeDashboard() {
-  // اطلاعات کارمند (در حالت واقعی از احراز هویت می‌آید)
-  const employeeName = "امیر حسینی";
-  const employeeRole = "کارمند پشتیبانی";
-  const employeeDepartment = "حسابداری";
-  const myTicketsCount = myTickets.length;
-  const needResponseCount = myTickets.filter(t => t.status === "unanswered").length;
+  const { role } = useRoleStore();
+  const [conversations, setConversations] = useState<Conversation[]>(myConversations);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showDetailsSidebar, setShowDetailsSidebar] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [isMobile, setIsMobile] = useState(false);
+  
+  const currentUser = "علی احمدی";
+  const currentUserInitial = "ع";
 
+  // تشخیص سایز صفحه
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, []);
+
+  // در موبایل، هنگام انتخاب چت، به حالت chat برو
+  const handleSelectConversation = (conv: Conversation) => {
+    setSelectedConversation(conv);
+    setShowDetailsSidebar(false);
+    if (isMobile) {
+      setViewMode("chat");
+    }
+  };
+
+  // بازگشت به لیست در موبایل
+  const handleBackToList = () => {
+    setViewMode("list");
+    setShowDetailsSidebar(false);
+  };
+
+  // بازگشت به چت از جزئیات در موبایل
+  const handleBackToChat = () => {
+    setViewMode("chat");
+    setShowDetailsSidebar(false);
+  };
+
+  const filteredConversations = conversations.filter((conv) => {
+    if (statusFilter === "all") return true;
+    return conv.status === statusFilter;
+  });
+
+  const handleSendMessage = (messageText: string, isInternalNote: boolean) => {
+    if (!selectedConversation) return;
+    
+    const newMsg = {
+      id: selectedConversation.messages.length + 1,
+      senderName: currentUser,
+      text: messageText,
+      time: new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }),
+      isSupport: true,
+      isInternalNote: isInternalNote,
+    };
+    
+    const updatedConv = {
+      ...selectedConversation,
+      messages: [...selectedConversation.messages, newMsg],
+      lastMessage: messageText,
+      time: "همین الان",
+      lastActivity: "همین الان",
+    };
+    
+    setConversations(conversations.map(c => c.id === selectedConversation.id ? updatedConv : c));
+    setSelectedConversation(updatedConv);
+  };
+
+  const handleToggleDetails = () => {
+    if (isMobile) {
+      setViewMode("details");
+    } else {
+      setShowDetailsSidebar(!showDetailsSidebar);
+    }
+  };
+
+  if (role !== "کارمند") {
+    return null;
+  }
+
+  // حالت دسکتاپ - نمایش همه بخش‌ها
+  if (!isMobile) {
+    return (
+      <div className="h-[calc(100vh-120px)] flex overflow-hidden">
+        {/* سایدبار چپ - لیست گفتگوها */}
+        <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.01)] rounded-2xl overflow-hidden">
+          <EmployeeConversationList
+            conversations={filteredConversations}
+            selectedConversation={selectedConversation}
+            statusFilter={statusFilter}
+            onSelectConversation={handleSelectConversation}
+            onStatusFilterChange={setStatusFilter}
+          />
+        </div>
+
+        {/* بخش اصلی - نمایش گفتگو */}
+        <div className="flex-1 flex flex-col mr-4">
+          {selectedConversation ? (
+            <>
+              <EmployeeChatHeader
+                conversation={selectedConversation}
+                currentUser={currentUser}
+                currentUserInitial={currentUserInitial}
+                onToggleDetails={handleToggleDetails}
+              />
+              <EmployeeChatMessages messages={selectedConversation.messages} source={selectedConversation.source} />
+              <EmployeeChatInput onSendMessage={handleSendMessage} />
+            </>
+          ) : (
+            <EmployeeEmptyState />
+          )}
+        </div>
+
+        {/* سایدبار راست - جزئیات گفتگو */}
+        {selectedConversation && showDetailsSidebar && (
+          <EmployeeDetailsSidebar
+            conversation={selectedConversation}
+            isOpen={showDetailsSidebar}
+            onClose={() => setShowDetailsSidebar(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // حالت موبایل - نمایش یک بخش در هر زمان
   return (
-    <div className="space-y-6">
-      {/* دکمه صفحه اصلی */}
-      <div className="relative">
-        <Link
-          href="/"
-          className="absolute top-0 left-0 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[#59D8C3]/20 text-[11px] text-gray-400 hover:text-white hover:border-[#59D8C3]/40 transition-all duration-300"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-          <span>صفحه اصلی</span>
-        </Link>
-        <div className="pt-10">
-          <div className="flex items-center gap-3 mb-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">داشبورد من</h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                تیکت‌های اختصاص‌یافته به {employeeName}
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 rounded-full border font-medium px-2.5 py-1 text-xs bg-gray-500/10 text-gray-400 border-gray-500/30">
-              {employeeRole}
-            </span>
-          </div>
+    <div className="h-[calc(100vh-120px)] overflow-hidden">
+      {/* حالت لیست گفتگوها */}
+      {viewMode === "list" && (
+        <div className="h-full border-l border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.01)] rounded-2xl overflow-hidden">
+          <EmployeeConversationList
+            conversations={filteredConversations}
+            selectedConversation={selectedConversation}
+            statusFilter={statusFilter}
+            onSelectConversation={handleSelectConversation}
+            onStatusFilterChange={setStatusFilter}
+          />
         </div>
-      </div>
+      )}
 
-      {/* کارت‌های آماری */}
-      <div className="grid grid-cols-2 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="rounded-2xl bg-[#0D1B17] border border-[#59D8C3]/20 p-5 hover:border-[#59D8C3]/40 transition-all duration-300 cursor-pointer"
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">تیکت‌های من</p>
-              <p className="text-2xl font-bold text-[#59D8C3]">{myTicketsCount}</p>
-            </div>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#59D8C3]/10">
-              <FileText className="w-5 h-5 text-[#59D8C3]" />
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-2xl bg-[#0D1B17] border border-[#59D8C3]/20 p-5 hover:border-[#59D8C3]/40 transition-all duration-300 cursor-pointer"
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">نیاز به پاسخ</p>
-              <p className="text-2xl font-bold text-[#F2B84B]">{needResponseCount}</p>
-            </div>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#F2B84B]/10">
-              <AlertCircle className="w-5 h-5 text-[#F2B84B]" />
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* اطلاعات کاربر */}
-      <div className="p-4 rounded-2xl bg-[#59D8C3]/10 border border-[#59D8C3]/20">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full border font-medium px-2.5 py-1 text-xs bg-gray-500/10 text-gray-400 border-gray-500/30">
-            {employeeRole}
-          </span>
-          <span className="text-xs text-gray-500">دپارتمان: {employeeDepartment}</span>
+      {/* حالت چت */}
+      {viewMode === "chat" && selectedConversation && (
+        <div className="h-full flex flex-col relative">
+          {/* دکمه بازگشت */}
+          <button
+            onClick={handleBackToList}
+            className=" z-10 w-6 h-6 mb-2 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] flex items-center justify-center text-white hover:bg-[rgba(255,255,255,0.1)] transition-all"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+          
+          <EmployeeChatHeader
+            conversation={selectedConversation}
+            currentUser={currentUser}
+            currentUserInitial={currentUserInitial}
+            onToggleDetails={handleToggleDetails}
+          />
+          <EmployeeChatMessages messages={selectedConversation.messages} source={selectedConversation.source} />
+          <EmployeeChatInput onSendMessage={handleSendMessage} />
         </div>
-        <p className="text-xs text-gray-500">
-          فقط تیکت‌های اختصاص‌داده‌شده به شما نمایش داده می‌شود.
-        </p>
-      </div>
+      )}
 
-      {/* تیکت‌های اختصاص یافته به من */}
-      <div className="rounded-2xl bg-[#0D1B17] border border-[#59D8C3]/20 p-5">
-        <h3 className="text-sm font-semibold text-white mb-4">
-          تیکت‌های اختصاص یافته به من
-        </h3>
-        <div className="space-y-3">
-          {myTickets.map((ticket, index) => (
-            <motion.div
-              key={ticket.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + index * 0.1 }}
-              className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[#59D8C3]/20 hover:border-[#59D8C3]/40 cursor-pointer transition-all"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-[#59D8C3]">#{ticket.id}</span>
-                  <span className="text-xs text-white truncate">{ticket.title}</span>
-                </div>
-                <p className="text-[11px] text-gray-500 mt-0.5">
-                  {ticket.customer} · {ticket.time}
-                </p>
-              </div>
-              {getStatusBadge(ticket.status, ticket.statusText)}
-            </motion.div>
-          ))}
+      {/* حالت جزئیات */}
+      {viewMode === "details" && selectedConversation && (
+        <div className="h-full relative">       
+          <EmployeeDetailsSidebar
+            conversation={selectedConversation}
+            isOpen={true}
+            onClose={handleBackToChat}
+          />
         </div>
-      </div>
+      )}
     </div>
   );
 }

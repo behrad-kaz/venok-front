@@ -1,279 +1,356 @@
-// app/dashboard/members/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Search, Plus, Users } from "lucide-react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import Link from "next/link";
-import MembersTable from "@/components/dashboard/members/MembersTable";
-import MemberCard from "@/components/dashboard/members/MemberCard";
-import MembersFilters from "@/components/dashboard/members/MembersFilters";
-import AddMemberModal from "@/components/dashboard/members/AddMemberModal";
-import EditMemberModal from "@/components/dashboard/members/EditMemberModal";
-import ChangePasswordModal from "@/components/dashboard/members/ChangePasswordModal";
-import DeactivateMemberModal from "@/components/dashboard/members/DeactivateMemberModal";
-import DeleteMemberModal from "@/components/dashboard/members/DeleteMemberModal";
-import { Member } from "@/components/dashboard/members/types";
-import { useRoleStore } from "@/stores/useRoleStore";
 import RoleGuard from "@/components/dashboard/RoleGuard";
+import { useRoleStore } from "@/stores/useRoleStore";
+import { membersData, departments, statsData } from "@/components/dashboard/members/data";
+import { Member } from "@/components/dashboard/members/types";
+import StatsCards from "@/components/dashboard/members/StatsCards";
+import MemberFilters from "@/components/dashboard/members/MemberFilters";
+import MemberCard from "@/components/dashboard/members/MemberCard";
+import MemberSidebar from "@/components/dashboard/members/MemberSidebar";
 
-// دپارتمان مدیران (در حالت واقعی از API می‌آید)
-const getManagerDepartment = (role: string, name: string): string => {
-  // برای نمونه، فرض می‌کنیم سارا محمدی مدیر حسابداری است
-  if (name === "سارا محمدی") return "حسابداری";
-  if (name === "علی احمدی") return "سفرهای داخلی";
-  if (name === "نیلوفر کریمی") return "سفرهای خارجی";
-  if (name === "رضا نادری") return "پشتیبانی فنی";
-  return "حسابداری";
-};
-
-const allMembersData: Member[] = [
-  { id: 1, name: "مریم رضایی", username: "maryam.rezaei", role: "مدیر کل", department: "همه دپارتمان‌ها", status: "online", tickets: 0, lastActivity: "همین الان" },
-  { id: 2, name: "سارا محمدی", username: "sara.m", role: "مدیر دپارتمان", department: "حسابداری", status: "online", tickets: 4, lastActivity: "۵ دقیقه پیش" },
-  { id: 3, name: "علی احمدی", username: "ali.a", role: "مدیر دپارتمان", department: "سفرهای داخلی", status: "offline", tickets: 6, lastActivity: "۲ ساعت پیش" },
-  { id: 4, name: "نیلوفر کریمی", username: "niloo.k", role: "مدیر دپارتمان", department: "سفرهای خارجی", status: "online", tickets: 3, lastActivity: "۱۰ دقیقه پیش" },
-  { id: 5, name: "امیر حسینی", username: "amir.h", role: "کارمند پشتیبانی", department: "حسابداری", status: "online", tickets: 5, lastActivity: "همین الان" },
-  { id: 6, name: "الهام کاظمی", username: "elham.k", role: "کارمند پشتیبانی", department: "سفرهای داخلی", status: "offline", tickets: 3, lastActivity: "۱ ساعت پیش" },
-  { id: 7, name: "رضا نادری", username: "reza.n", role: "مدیر دپارتمان", department: "پشتیبانی فنی", status: "online", tickets: 2, lastActivity: "۲۰ دقیقه پیش" },
-  { id: 8, name: "احمد کریمی", username: "ahmad.k", role: "کارمند پشتیبانی", department: "حسابداری", status: "online", tickets: 2, lastActivity: "۳۰ دقیقه پیش" },
-  { id: 9, name: "زهرا محمدی", username: "zahra.m", role: "کارمند پشتیبانی", department: "حسابداری", status: "offline", tickets: 1, lastActivity: "۳ ساعت پیش" },
-];
-
-const getInitials = (name: string) => {
-  const names = name.split(" ");
-  if (names.length >= 2) return `${names[0].charAt(0)}${names[1].charAt(0)}`;
-  return name.charAt(0);
-};
+// کامپوننت‌های اختصاصی برای مدیر دپارتمان
+import DepartmentMemberCard from "@/components/dashboard/members/DepartmentMemberCard";
+import DepartmentStatsCards from "@/components/dashboard/members/DepartmentStatsCards";
 
 export default function MembersPage() {
   const { role } = useRoleStore();
-  const [userName, setUserName] = useState("سارا محمدی"); // در حالت واقعی از احراز هویت می‌آید
   
-  const [members, setMembers] = useState<Member[]>([]);
+  // ========== STATE برای مدیر کل ==========
+  const [members, setMembers] = useState<Member[]>(membersData);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
+  const [selectedRole, setSelectedRole] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedPresence, setSelectedPresence] = useState("all");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
 
-  // مودال‌ها
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-
-  // فرم‌ها
-  const [newMember, setNewMember] = useState({ 
-    name: "", 
-    username: "", 
-    password: "", 
-    confirmPassword: "", 
-    department: "", 
-    role: "",
-    status: "active" 
-  });
+  // ========== STATE برای مدیر دپارتمان ==========
+  const [deptMembers, setDeptMembers] = useState<Member[]>([]);
+  const [deptSearchQuery, setDeptSearchQuery] = useState("");
+  const [deptPresenceFilter, setDeptPresenceFilter] = useState("all");
+  const [deptStatusFilter, setDeptStatusFilter] = useState("all");
   
-  const [editMember, setEditMember] = useState({ 
-    name: "", 
-    username: "", 
-    department: "", 
-    role: "",
-    status: "active" 
-  });
-  
-  const [passwordData, setPasswordData] = useState({ newPassword: "", confirmPassword: "" });
+  // دپارتمان مدیر دپارتمان (در حالت واقعی از پروفایل کاربر می‌آید)
+  const managerDepartment = "پشتیبانی";
+  const managerName = "امیر حسینی";
 
-  // فیلتر کردن اعضا بر اساس نقش و دپارتمان
-  useEffect(() => {
-    let filteredMembers = [...allMembersData];
-    
-    if (role === "مدیر") {
-      const managerDepartment = getManagerDepartment(role, userName);
-      // مدیر فقط اعضای دپارتمان خود را می‌بیند
-      filteredMembers = filteredMembers.filter(m => 
-        m.department === managerDepartment || m.role === "مدیر کل"
-      );
+  // ========== LOGIC برای مدیر کل ==========
+  const filteredMembers = members.filter((member) => {
+    const fullName = `${member.firstName} ${member.lastName}`;
+    if (searchQuery && !fullName.includes(searchQuery) && !member.username.includes(searchQuery) && !member.phone.includes(searchQuery)) {
+      return false;
     }
-    
-    setMembers(filteredMembers);
-  }, [role, userName]);
-
-  const filteredMembers = members.filter((m) => {
-    const matchesSearch = searchQuery === "" || m.name.includes(searchQuery) || m.username.includes(searchQuery);
-    const matchesRole = roleFilter === "all" || m.role === roleFilter;
-    const matchesStatus = statusFilter === "all" || m.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
+    if (selectedDepartment !== "all" && member.departmentId !== parseInt(selectedDepartment)) {
+      return false;
+    }
+    if (selectedRole !== "all" && member.role !== selectedRole) {
+      return false;
+    }
+    if (selectedStatus !== "all" && member.status !== selectedStatus) {
+      return false;
+    }
+    if (selectedPresence !== "all" && member.presence !== selectedPresence) {
+      return false;
+    }
+    return true;
   });
 
-  const handleAddMember = () => {
-    if (!newMember.name || !newMember.username || !newMember.password || !newMember.department || !newMember.role) return;
-    if (newMember.password !== newMember.confirmPassword) { alert("رمز عبور مطابقت ندارد"); return; }
-    
-    const managerDepartment = role === "مدیر" ? getManagerDepartment(role, userName) : newMember.department;
-    
-    setMembers([...members, { 
-      id: members.length + 1, 
-      name: newMember.name, 
-      username: newMember.username, 
-      role: newMember.role as any, 
-      department: role === "مدیر" ? managerDepartment : newMember.department, 
-      status: newMember.status === "active" ? "online" : "offline", 
-      tickets: 0, 
-      lastActivity: "همین الان" 
-    }]);
-    setIsAddModalOpen(false);
-    setNewMember({ name: "", username: "", password: "", confirmPassword: "", department: "", role: "", status: "active" });
-  };
-
-  const handleEditMember = () => {
-    if (!selectedMember) return;
-    setMembers(members.map(m => m.id === selectedMember.id ? { 
-      ...m, 
-      name: editMember.name,
-      username: editMember.username,
-      department: editMember.department,
-      role: editMember.role as any,
-      status: editMember.status === "active" ? "online" : "offline"
-    } : m));
-    setIsEditModalOpen(false);
-    setSelectedMember(null);
-  };
-
-  const handleChangePassword = () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) { alert("رمز عبور مطابقت ندارد"); return; }
-    console.log("تغییر رمز برای:", selectedMember?.name);
-    setIsPasswordModalOpen(false);
-    setPasswordData({ newPassword: "", confirmPassword: "" });
-  };
-
-  const handleDeactivate = () => { 
-    setIsDeactivateModalOpen(false); 
-    setSelectedMember(null); 
-  };
-  
-  const handleDelete = () => { 
-    if (selectedMember) setMembers(members.filter(m => m.id !== selectedMember.id)); 
-    setIsDeleteModalOpen(false); 
-    setSelectedMember(null); 
-  };
-
-  const openEditModal = (m: Member) => { 
-    setSelectedMember(m); 
-    setEditMember({ 
-      name: m.name, 
-      username: m.username, 
-      department: m.department, 
-      role: m.role,
-      status: m.status === "online" ? "active" : "inactive"
-    }); 
-    setIsEditModalOpen(true); 
-  };
-  
-  const openPasswordModal = (m: Member) => { 
-    setSelectedMember(m); 
-    setPasswordData({ newPassword: "", confirmPassword: "" }); 
-    setIsPasswordModalOpen(true); 
-  };
-  
-  const openDeactivateModal = (m: Member) => { 
-    setSelectedMember(m); 
-    setIsDeactivateModalOpen(true); 
-  };
-  
-  const openDeleteModal = (m: Member) => { 
-    setSelectedMember(m); 
-    setIsDeleteModalOpen(true); 
-  };
-
-  // عنوان صفحه بر اساس نقش
-  const getPageTitle = () => {
-    if (role === "مدیر") {
-      const department = getManagerDepartment(role, userName);
-      return {
-        title: "مدیریت اعضا",
-        description: `اعضای دپارتمان ${department}`,
-      };
-    }
-    return {
-      title: "مدیریت اعضا",
-      description: "مدیریت تمامی اعضای سازمان",
+  const handleAddMember = (data: {
+    firstName: string;
+    lastName: string;
+    username: string;
+    phone: string;
+    departmentId: number;
+    role: "مدیر دپارتمان" | "کارمند";
+    status: "active" | "inactive";
+    password?: string;
+  }) => {
+    const department = departments.find(d => d.id === data.departmentId);
+    const newMember: Member = {
+      id: members.length + 1,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      username: data.username,
+      phone: data.phone,
+      role: data.role,
+      departmentId: data.departmentId,
+      departmentName: department?.name || "",
+      status: data.status,
+      presence: "offline",
+      lastActivity: "همین الان",
+      openTickets: 0,
     };
+    setMembers([...members, newMember]);
   };
 
-  const pageTitle = getPageTitle();
+  const handleEditMember = (data: {
+    firstName: string;
+    lastName: string;
+    username: string;
+    phone: string;
+    departmentId: number;
+    role: "مدیر دپارتمان" | "کارمند";
+    status: "active" | "inactive";
+  }) => {
+    if (editingMember) {
+      const department = departments.find(d => d.id === data.departmentId);
+      setMembers(
+        members.map((m) =>
+          m.id === editingMember.id
+            ? {
+                ...m,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                username: data.username,
+                phone: data.phone,
+                role: data.role,
+                departmentId: data.departmentId,
+                departmentName: department?.name || "",
+                status: data.status,
+              }
+            : m
+        )
+      );
+      setEditingMember(null);
+    }
+  };
 
-  return (
-     <RoleGuard allowedRoles={["مدیر کل", "مدیر"]}>
-    <DashboardLayout>
-      <div className="max-w-7xl mx-auto">
-        <div className="relative mb-6">
-          <Link href="/" className="absolute top-0 left-0 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[#59D8C3]/20 text-[11px] text-gray-400 hover:text-white hover:border-[#59D8C3]/40 transition-all duration-300">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg><span>صفحه اصلی</span>
-          </Link>
-          <div className="pt-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-white">{pageTitle.title}</h1>
-                <p className="text-gray-400 text-sm mt-0.5">{pageTitle.description} • {filteredMembers.length} عضو</p>
-              </div>
-              {role !== "مدیر" && (
-                <button onClick={() => setIsAddModalOpen(true)} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] font-medium hover:shadow-lg transition-all duration-300 flex items-center gap-2 text-sm">+ افزودن عضو</button>
-              )}
+  const openEditSidebar = (member: Member) => {
+    setEditingMember(member);
+    setIsSidebarOpen(true);
+  };
+
+  // ========== LOGIC برای مدیر دپارتمان ==========
+  useEffect(() => {
+    // فیلتر کردن اعضای فقط همان دپارتمان
+    let filtered = membersData.filter(
+      (member) => member.departmentName === managerDepartment
+    );
+    
+    // اضافه کردن مدیر دپارتمان به لیست اگر نبود
+    const hasManager = filtered.some(m => m.role === "مدیر دپارتمان");
+    if (!hasManager) {
+      const managerMember: Member = {
+        id: 99,
+        firstName: "امیر",
+        lastName: "حسینی",
+        username: "amir.hosseini",
+        phone: "09129876543",
+        role: "مدیر دپارتمان",
+        departmentId: 2,
+        departmentName: managerDepartment,
+        status: "active",
+        presence: "online",
+        lastActivity: "همین الان",
+        openTickets: 3,
+      };
+      filtered = [managerMember, ...filtered];
+    }
+    
+    setDeptMembers(filtered);
+  }, []);
+
+  const filteredDeptMembers = deptMembers.filter((member) => {
+    const fullName = `${member.firstName} ${member.lastName}`;
+    if (deptSearchQuery && !fullName.includes(deptSearchQuery) && !member.username.includes(deptSearchQuery)) {
+      return false;
+    }
+    if (deptPresenceFilter !== "all" && member.presence !== deptPresenceFilter) {
+      return false;
+    }
+    if (deptStatusFilter !== "all" && member.status !== deptStatusFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  const deptStats = {
+    totalMembers: filteredDeptMembers.length,
+    onlineMembers: filteredDeptMembers.filter(m => m.presence === "online").length,
+    totalOpenTickets: filteredDeptMembers.reduce((sum, m) => sum + m.openTickets, 0),
+    membersWithTickets: filteredDeptMembers.filter(m => m.openTickets > 0).length,
+  };
+
+  // اگر نقش مدیر دپارتمان است، صفحه اختصاصی را نمایش بده
+  if (role === "مدیر") {
+    return (
+      <RoleGuard allowedRoles={["مدیر"]}>
+        <DashboardLayout>
+          <div className="space-y-6">
+            {/* هدر صفحه */}
+            <div>
+              <h1 className="text-2xl font-bold text-white mb-1">اعضای دپارتمان</h1>
+              <p className="text-sm text-gray-500">لیست و مدیریت اعضای دپارتمان {managerDepartment}</p>
             </div>
 
-            {/* هشدار برای نقش مدیر */}
-            {role === "مدیر" && (
-              <div className="flex items-center gap-2 px-4 py-2.5 mt-4 rounded-xl bg-[#59D8C3]/10 border border-[#59D8C3]/20 text-xs text-gray-400">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#59d8c3" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="16" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12.01" y2="8" />
-                </svg>
-                شما فقط اعضای دپارتمان خودتان را می‌بینید.
+            {/* جستجو */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex-1 min-w-[280px] relative">
+                <input
+                  type="text"
+                  placeholder="جستجو در اعضای دپارتمان"
+                  value={deptSearchQuery}
+                  onChange={(e) => setDeptSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2.5 pr-10 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
+                />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              </div>
+              <button className="px-4 py-2.5 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all whitespace-nowrap">
+                درخواست تغییر عضو از مدیرکل
+              </button>
+            </div>
+
+            {/* فیلترهای حضور و وضعیت */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">وضعیت حضور:</span>
+                <div className="flex gap-2">
+                  {["all", "online", "offline"].map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setDeptPresenceFilter(filter)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                        deptPresenceFilter === filter
+                          ? "bg-[rgba(89,216,195,0.12)] border-[rgba(89,216,195,0.25)] text-[#59D8C3]"
+                          : "bg-[rgba(255,255,255,0.03)] border-transparent text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.05)]"
+                      }`}
+                    >
+                      {filter === "all" ? "همه" : filter === "online" ? "آنلاین" : "آفلاین"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">وضعیت حساب:</span>
+                <div className="flex gap-2">
+                  {["all", "active", "inactive"].map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setDeptStatusFilter(filter)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                        deptStatusFilter === filter
+                          ? "bg-[rgba(89,216,195,0.12)] border-[rgba(89,216,195,0.25)] text-[#59D8C3]"
+                          : "bg-[rgba(255,255,255,0.03)] border-transparent text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.05)]"
+                      }`}
+                    >
+                      {filter === "all" ? "همه" : filter === "active" ? "فعال" : "غیرفعال"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* کارت‌های آمار دپارتمان */}
+            <DepartmentStatsCards stats={deptStats} />
+
+            {/* لیست اعضای دپارتمان */}
+            <div className="space-y-4">
+              {filteredDeptMembers.map((member, index) => (
+                <DepartmentMemberCard key={member.id} member={member} index={index} />
+              ))}
+            </div>
+
+            {/* پیام خالی بودن لیست */}
+            {filteredDeptMembers.length === 0 && (
+              <div className="text-center py-12 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
+                <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400">هیچ عضوی در این دپارتمان یافت نشد</p>
               </div>
             )}
+          </div>
+        </DashboardLayout>
+      </RoleGuard>
+    );
+  }
 
-            <MembersFilters 
-              searchQuery={searchQuery} 
-              onSearchChange={setSearchQuery} 
-              roleFilter={roleFilter} 
-              onRoleChange={setRoleFilter} 
-              statusFilter={statusFilter} 
-              onStatusChange={setStatusFilter} 
-            />
-            
-            <MembersTable 
-              members={filteredMembers} 
-              onEdit={openEditModal} 
-              onPassword={openPasswordModal} 
-              onDeactivate={openDeactivateModal} 
-              onDelete={openDeleteModal} 
-              getInitials={getInitials} 
-            />
-            
-            <div className="lg:hidden space-y-3 mt-6">
-              {filteredMembers.map((m) => (
-                <MemberCard 
-                  key={m.id} 
-                  member={m} 
-                  onEdit={openEditModal} 
-                  onPassword={openPasswordModal} 
-                  onDelete={openDeleteModal} 
-                  getInitials={getInitials} 
+  // برای مدیر کل، صفحه اصلی اعضا را نمایش بده
+  if (role === "مدیر کل") {
+    return (
+      <RoleGuard allowedRoles={["مدیر کل"]}>
+        <DashboardLayout>
+          <div className="space-y-6">
+            {/* جستجو و دکمه افزودن */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex-1 min-w-[280px] relative">
+                <input
+                  type="text"
+                  placeholder="جستجو بر اساس نام، شماره همراه یا نام کاربری"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2.5 pr-10 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
                 />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              </div>
+              <button
+                onClick={() => {
+                  setEditingMember(null);
+                  setIsSidebarOpen(true);
+                }}
+                className="px-5 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] hover:shadow-lg transition-all flex items-center gap-2 whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                <span>افزودن عضو جدید</span>
+              </button>
+            </div>
+
+            {/* فیلترها */}
+            <MemberFilters
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedDepartment={selectedDepartment}
+              onDepartmentChange={setSelectedDepartment}
+              selectedRole={selectedRole}
+              onRoleChange={setSelectedRole}
+              selectedStatus={selectedStatus}
+              onStatusChange={setSelectedStatus}
+              selectedPresence={selectedPresence}
+              onPresenceChange={setSelectedPresence}
+              departments={departments}
+            />
+
+            {/* کارت‌های آمار */}
+            <StatsCards stats={statsData} />
+
+            {/* لیست اعضا */}
+            <div className="space-y-4">
+              {filteredMembers.map((member, index) => (
+                <MemberCard key={member.id} member={member} index={index} onEdit={openEditSidebar} />
               ))}
             </div>
           </div>
+
+          {/* سایدبار افزودن/ویرایش عضو */}
+          <MemberSidebar
+            isOpen={isSidebarOpen}
+            onClose={() => {
+              setIsSidebarOpen(false);
+              setEditingMember(null);
+            }}
+            editingMember={editingMember}
+            departments={departments}
+            onSave={editingMember ? handleEditMember : handleAddMember}
+            title={editingMember ? "ویرایش اطلاعات عضو" : "افزودن عضو جدید"}
+            subtitle={!editingMember ? "این اطلاعات برای ورود عضو به پنل استفاده می‌شود." : undefined}
+          />
+        </DashboardLayout>
+      </RoleGuard>
+    );
+  }
+
+  // برای کارمند
+  return (
+    <RoleGuard allowedRoles={["کارمند"]}>
+      <DashboardLayout>
+        <div className="text-center py-12">
+          <p className="text-gray-400">شما دسترسی مشاهده اعضا را ندارید</p>
         </div>
-      </div>
-      
-      {role !== "مدیر" && (
-        <AddMemberModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSubmit={handleAddMember} formData={newMember} setFormData={setNewMember} />
-      )}
-      <EditMemberModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSubmit={handleEditMember} formData={editMember} setFormData={setEditMember} memberName={selectedMember?.name} />
-      <ChangePasswordModal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} onSubmit={handleChangePassword} formData={passwordData} setFormData={setPasswordData} memberName={selectedMember?.name} />
-      <DeactivateMemberModal isOpen={isDeactivateModalOpen} onClose={() => setIsDeactivateModalOpen(false)} onConfirm={handleDeactivate} memberName={selectedMember?.name} />
-      <DeleteMemberModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDelete} memberName={selectedMember?.name} />
-    </DashboardLayout>
+      </DashboardLayout>
     </RoleGuard>
   );
 }

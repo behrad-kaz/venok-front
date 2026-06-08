@@ -1,4 +1,3 @@
-// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -15,53 +14,58 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
- const handleLogin = (e: React.FormEvent) => {
-  e.preventDefault();
-  setError("");
-  setIsLoading(true);
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
 
-  setTimeout(() => {
-    let role = "";
-    let name = "";
-    
-    // تشخیص نقش بر اساس نام کاربری
-    if (username === "admin" && password === "123456") {
-      role = "مدیر کل";
-      name = "مریم رضایی";
-    } else if (username === "manager.support" && password === "manager123") {
-      role = "مدیر";
-      name = "سارا محمدی";
-    } else if (username === "staff.ali" && password === "staff123") {
-      role = "کارمند";
-      name = "علی احمدی";
-    } else {
-      setError("نام کاربری یا رمز عبور اشتباه است");
-      setIsLoading(false);
-      return;
-    }
-
-    // ذخیره در localStorage
-    localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("userRole", role);
-    localStorage.setItem("userName", name);
-    
-    // اگر مدیر کل است و هنوز onboarding را ندیده، flag را false بگذار
-    if (role === "مدیر کل") {
-      const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
-      if (!hasSeenOnboarding) {
-        localStorage.setItem("hasSeenOnboarding", "false");
+    setTimeout(() => {
+      let role = "";
+      let roleEnglish = "";
+      let name = "";
+      
+      // تشخیص نقش بر اساس نام کاربری
+      if (username === "admin" && password === "123456") {
+        role = "مدیر کل";
+        roleEnglish = "super_admin";
+        name = "مریم رضایی";
+      } else if (username === "manager.support" && password === "manager123") {
+        role = "مدیر";
+        roleEnglish = "manager";
+        name = "سارا محمدی";
+      } else if (username === "staff.ali" && password === "staff123") {
+        role = "کارمند";
+        roleEnglish = "staff";
+        name = "علی احمدی";
+      } else {
+        setError("نام کاربری یا رمز عبور اشتباه است");
+        setIsLoading(false);
+        return;
       }
-    }
-    
-    // برای middleware هم کوکی ست می‌کنیم
-    document.cookie = `isLoggedIn=true; path=/; max-age=${60 * 60 * 24 * 7}`;
-    document.cookie = `userRole=${role}; path=/; max-age=${60 * 60 * 24 * 7}`;
-    document.cookie = `hasSeenOnboarding=${role === "مدیر کل" ? "false" : "true"}; path=/; max-age=${60 * 60 * 24 * 7}`;
-    
-    router.push("/dashboard");
-    setIsLoading(false);
-  }, 800);
-};
+
+      // ذخیره در localStorage با مقدار فارسی (برای نمایش در UI)
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("userRole", role); // مقدار فارسی برای نمایش
+      localStorage.setItem("userRoleEnglish", roleEnglish); // مقدار انگلیسی برای کوکی
+      localStorage.setItem("userName", name);
+      
+      // اگر مدیر کل است و هنوز onboarding را ندیده، flag را false بگذار
+      if (role === "مدیر کل") {
+        const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
+        if (!hasSeenOnboarding) {
+          localStorage.setItem("hasSeenOnboarding", "false");
+        }
+      }
+      
+      // ✅ ذخیره در کوکی با مقدار انگلیسی (بدون نیاز به encodeURIComponent)
+      document.cookie = `isLoggedIn=true; path=/; max-age=${60 * 60 * 24 * 7}`;
+      document.cookie = `userRole=${roleEnglish}; path=/; max-age=${60 * 60 * 24 * 7}`;
+      document.cookie = `hasSeenOnboarding=${role === "مدیر کل" ? "false" : "true"}; path=/; max-age=${60 * 60 * 24 * 7}`;
+
+      router.push("/dashboard");
+      setIsLoading(false);
+    }, 800);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#193631] to-[#000000] relative overflow-hidden">

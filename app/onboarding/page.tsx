@@ -4,7 +4,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, MessageCircle, Users, BarChart3, CheckCircle } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  MessageCircle,
+  Users,
+  BarChart3,
+  CheckCircle,
+} from "lucide-react";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -15,37 +22,41 @@ export default function OnboardingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError("");
-  setIsLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
 
-  // شبیه‌سازی درخواست به سرور
-  setTimeout(() => {
-    // بررسی اعتبار (admin/admin123 برای مدیر کل)
-    if (username === "admin" && password === "admin123") {
-      // ذخیره کردن که مدیر کل onboarding را دیده است
-      localStorage.setItem("hasSeenOnboarding", "true");
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userRole", "مدیر کل");
-      
-      // تنظیم کوکی برای middleware
-      document.cookie = `isLoggedIn=true; path=/; max-age=${60 * 60 * 24 * 7}`;
-      document.cookie = `userRole=مدیر کل; path=/; max-age=${60 * 60 * 24 * 7}`;
-      document.cookie = `hasSeenOnboarding=true; path=/; max-age=${60 * 60 * 24 * 7}`;
-      
-      // ریدایرکت به صفحه موفقیت (به جای مستقیم به داشبورد)
-      router.push("/onboarding/success");
-    } else {
-      setError("نام کاربری یا رمز عبور اشتباه است");
-      setIsLoading(false);
-    }
-  }, 800);
-};
+    // شبیه‌سازی درخواست به سرور
+    setTimeout(() => {
+      // بررسی اعتبار (admin/admin123 برای مدیر کل)
+      if (username === "admin" && password === "admin123") {
+        // ذخیره کردن که مدیر کل onboarding را دیده است
+        localStorage.setItem("hasSeenOnboarding", "true");
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("userRole", "مدیر کل");
+        localStorage.setItem("userRoleEnglish", "super_admin");
+
+        // تنظیم کوکی برای middleware با مقدار انگلیسی
+        document.cookie = `isLoggedIn=true; path=/; max-age=${60 * 60 * 24 * 7}`;
+        document.cookie = `userRole=super_admin; path=/; max-age=${60 * 60 * 24 * 7}`;
+        document.cookie = `hasSeenOnboarding=true; path=/; max-age=${60 * 60 * 24 * 7}`;
+
+        // ریدایرکت به صفحه موفقیت
+        router.push("/onboarding/success");
+      } else {
+        setError("نام کاربری یا رمز عبور اشتباه است");
+        setIsLoading(false);
+      }
+    }, 800);
+  };
 
   return (
     <main className="flex-1 overflow-y-auto rtl-scrollbar p-6">
-      <div className="min-h-screen bg-gradient-to-br from-[#0a3d35] to-[#050f0d] relative overflow-hidden" dir="rtl">
+      <div
+        className="min-h-screen bg-gradient-to-br from-[#0a3d35] to-[#050f0d] relative overflow-hidden"
+        dir="rtl"
+      >
         {/* پس‌زمینه با جلوه‌های بصری */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-[#59d8c3] to-transparent" />
@@ -65,7 +76,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] flex items-center justify-center mb-6">
                   <MessageCircle className="w-8 h-8 text-[#06110F]" />
                 </div>
-                <h1 className="text-4xl font-bold text-white mb-4">سیستم مدیریت گفتگو</h1>
+                <h1 className="text-4xl font-bold text-white mb-4">
+                  سیستم مدیریت گفتگو
+                </h1>
                 <p className="text-xl text-gray-300 leading-relaxed">
                   مدیریت گفتگوهای مشتریان در یک فضای متمرکز
                 </p>
@@ -77,8 +90,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                     <CheckCircle className="w-5 h-5 text-[#59d8c3]" />
                   </div>
                   <div>
-                    <p className="text-gray-300 text-sm font-medium">مدیریت چند دپارتمانی</p>
-                    <p className="text-gray-500 text-xs mt-0.5">سازماندهی هوشمند تیم‌ها</p>
+                    <p className="text-gray-300 text-sm font-medium">
+                      مدیریت چند دپارتمانی
+                    </p>
+                    <p className="text-gray-500 text-xs mt-0.5">
+                      سازماندهی هوشمند تیم‌ها
+                    </p>
                   </div>
                 </div>
 
@@ -87,8 +104,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                     <Users className="w-5 h-5 text-[#59d8c3]" />
                   </div>
                   <div>
-                    <p className="text-gray-300 text-sm font-medium">تخصیص هوشمند گفتگو</p>
-                    <p className="text-gray-500 text-xs mt-0.5">ارسال خودکار به کارشناس مربوطه</p>
+                    <p className="text-gray-300 text-sm font-medium">
+                      تخصیص هوشمند گفتگو
+                    </p>
+                    <p className="text-gray-500 text-xs mt-0.5">
+                      ارسال خودکار به کارشناس مربوطه
+                    </p>
                   </div>
                 </div>
 
@@ -97,8 +118,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                     <BarChart3 className="w-5 h-5 text-[#59d8c3]" />
                   </div>
                   <div>
-                    <p className="text-gray-300 text-sm font-medium">گزارش‌گیری دقیق</p>
-                    <p className="text-gray-500 text-xs mt-0.5">تحلیل عملکرد و رضایت مشتری</p>
+                    <p className="text-gray-300 text-sm font-medium">
+                      گزارش‌گیری دقیق
+                    </p>
+                    <p className="text-gray-500 text-xs mt-0.5">
+                      تحلیل عملکرد و رضایت مشتری
+                    </p>
                   </div>
                 </div>
               </div>
@@ -115,9 +140,11 @@ const handleSubmit = async (e: React.FormEvent) => {
             >
               <div className="p-8 rounded-3xl bg-[rgba(255,255,255,0.03)] backdrop-blur-xl border border-[rgba(255,255,255,0.1)] shadow-2xl">
                 <div className="mb-8">
-                  <h2 className="text-2xl font-bold text-white mb-2">ورود به پنل پشتیبانی</h2>
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                    ورود به پنل پشتیبانی
+                  </h2>
                   <p className="text-sm text-gray-400 leading-relaxed">
-                   برای مدیریت گفتگوها وارد حساب کاربری خود شوید.
+                    برای مدیریت گفتگوها وارد حساب کاربری خود شوید.
                   </p>
                 </div>
 
@@ -159,7 +186,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors"
                       >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        {showPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -173,7 +204,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                         onChange={(e) => setRememberMe(e.target.checked)}
                         className="w-4 h-4 rounded border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.05)] text-[#59D8C3] focus:ring-2 focus:ring-[#59D8C3]"
                       />
-                      <span className="text-sm text-gray-400">مرا به خاطر بسپار</span>
+                      <span className="text-sm text-gray-400">
+                        مرا به خاطر بسپار
+                      </span>
                     </label>
                     <button
                       type="button"

@@ -7,7 +7,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Building2, Users, Edit, UserPlus, ChevronLeft } from "lucide-react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import AddMemberToDepartmentModal from "@/components/dashboard/departments/AddMemberToDepartmentModal";
 
 interface Department {
   id: number;
@@ -339,14 +338,6 @@ export default function DepartmentDetailPage() {
           </div>
         </motion.div>
       </div>
-
-      {/* مودال افزودن عضو جدید */}
-      <AddMemberToDepartmentModal
-        isOpen={isAddMemberModalOpen}
-        onClose={() => setIsAddMemberModalOpen(false)}
-        onSubmit={handleAddMember}
-        departmentName={department.name}
-      />
     </DashboardLayout>
   );
 }

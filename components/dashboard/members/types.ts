@@ -1,14 +1,21 @@
 // components/dashboard/members/types.ts
-export type UserRole = "مدیر کل" | "مدیر دپارتمان" | "کارمند پشتیبانی";
-
 export interface Member {
   id: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   username: string;
-  role: UserRole;
-  department: string;
-  status: "online" | "offline";
-  tickets: number;
+  phone: string;
+  role: "مدیر دپارتمان" | "کارمند";
+  departmentId: number;
+  departmentName: string;
+  status: "active" | "inactive";
+  presence: "online" | "offline";
   lastActivity: string;
+  openTickets: number;
   avatar?: string;
+}
+
+export interface Department {
+  id: number;
+  name: string;
 }

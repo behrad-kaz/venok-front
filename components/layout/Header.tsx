@@ -1,4 +1,3 @@
-// components/layout/Header.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -28,14 +27,32 @@ interface HeaderProps {
   isMobileMenuOpen?: boolean;
 }
 
-const getPageTitle = (pathname: string): string => {
+// تابع دریافت عنوان صفحه با دریافت role به عنوان پارامتر
+const getPageTitle = (pathname: string, role?: UserRole): string => {
+  if (pathname === "/dashboard/my-conversations") return "گفتگوهای من";
   if (pathname === "/dashboard") return "داشبورد";
   if (pathname === "/dashboard/requests") return "درخواست‌ها";
   if (pathname === "/dashboard/conversations") return "گفتگوها";
   if (pathname === "/dashboard/departments") return "دپارتمان‌ها";
-  if (pathname === "/dashboard/members") return "اعضا";
-  if (pathname === "/dashboard/reports") return "گزارش‌ها";
-  if (pathname === "/dashboard/settings") return "تنظیمات";
+  
+  // صفحه اعضا بر اساس نقش
+  if (pathname === "/dashboard/members") {
+    if (role === "مدیر") return "اعضای دپارتمان";
+    return "اعضا";
+  }
+  
+  // صفحه گزارشات بر اساس نقش
+  if (pathname === "/dashboard/reports") {
+    if (role === "مدیر") return "گزارشات دپارتمان";
+    if (role === "کارمند") return "گزارشات من";
+    return "گزارش‌ها";
+  }
+  
+  if (pathname === "/dashboard/settings") {
+    if (role === "مدیر") return "تنظیمات دپارتمان";
+    return "تنظیمات";
+  }
+  
   return "داشبورد";
 };
 
@@ -51,9 +68,9 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const userInfo: UserInfo = {
-    name: selectedRole === "مدیر" ? "سارا محمدی" : "مریم رضایی",
+    name: selectedRole === "مدیر" ? "سارا محمدی" : selectedRole === "کارمند" ? "علی احمدی" : "مریم رضایی",
     role: selectedRole,
-    avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=${selectedRole === "مدیر" ? "سارا" : "مریم"}&length=2&font-size=0.24&size=40`,
+    avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=${selectedRole === "مدیر" ? "سارا" : selectedRole === "کارمند" ? "علی" : "مریم"}&length=2&font-size=0.24&size=40`,
   };
 
   const roles: UserRole[] = ["مدیر کل", "مدیر", "کارمند"];
@@ -61,6 +78,12 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
   useEffect(() => {
     const loggedIn = localStorage.getItem("isLoggedIn") === "true";
     setIsLoggedIn(loggedIn);
+
+    // خواندن نقش فارسی از localStorage
+    const savedRole = localStorage.getItem("userRole");
+    if (savedRole && savedRole !== selectedRole) {
+      setSelectedRole(savedRole as UserRole);
+    }
   }, []);
 
   const handleRoleChange = (role: UserRole) => {
@@ -68,19 +91,22 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
     setIsRoleMenuOpen(false);
   };
 
-const handleLogout = () => {
-  localStorage.removeItem("isLoggedIn");
-  localStorage.removeItem("userRole");
-  localStorage.removeItem("userName");
-  localStorage.removeItem("hasSeenOnboarding");
-  
-  // حذف کوکی‌ها
-  document.cookie = "isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-  document.cookie = "userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-  document.cookie = "hasSeenOnboarding=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-  
-  router.push("/login");
-};
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("hasSeenOnboarding");
+
+    // حذف کوکی‌ها
+    document.cookie =
+      "isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    document.cookie =
+      "userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    document.cookie =
+      "hasSeenOnboarding=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+
+    router.push("/login");
+  };
 
   const handleDashboard = () => {
     router.push("/dashboard");
@@ -90,7 +116,8 @@ const handleLogout = () => {
     router.push("/dashboard/profile");
   };
 
-  const pageTitle = getPageTitle(pathname);
+  // دریافت عنوان صفحه با پاس دادن selectedRole
+  const pageTitle = getPageTitle(pathname, selectedRole);
   const isDashboardPage = pathname?.startsWith("/dashboard");
 
   if (!isDashboardPage) return null;
@@ -106,7 +133,9 @@ const handleLogout = () => {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-base font-semibold text-white whitespace-nowrap">{pageTitle}</h1>
+            <h1 className="text-base font-semibold text-white whitespace-nowrap">
+              {pageTitle}
+            </h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -140,7 +169,9 @@ const handleLogout = () => {
                   <User className="w-4 h-4 text-[#59D8C3]" />
                   <span className="text-xs text-gray-300">نقش:</span>
                 </div>
-                <span className="text-xs text-white font-medium">{selectedRole}</span>
+                <span className="text-xs text-white font-medium">
+                  {selectedRole}
+                </span>
                 <ChevronDown
                   className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${
                     isRoleMenuOpen ? "rotate-180" : ""
@@ -200,27 +231,41 @@ const handleLogout = () => {
                     className="absolute left-0 top-12 w-80 bg-[#11241fd3] border border-[#59D8C3]/20 rounded-2xl shadow-2xl z-50 overflow-hidden"
                   >
                     <div className="p-4">
-                      <p className="text-sm font-semibold text-white mb-3">اعلان‌ها</p>
+                      <p className="text-sm font-semibold text-white mb-3">
+                        اعلان‌ها
+                      </p>
                       <div className="space-y-2">
                         <div className="flex gap-3 py-2.5 border-b border-[#59D8C3]/10 last:border-0">
                           <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#F2B84B]" />
                           <div>
-                            <p className="text-xs text-white">تیکت جدید از رضا احمدی</p>
-                            <p className="text-[10px] text-gray-500 mt-0.5">۵ دقیقه پیش</p>
+                            <p className="text-xs text-white">
+                              تیکت جدید از رضا احمدی
+                            </p>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              ۵ دقیقه پیش
+                            </p>
                           </div>
                         </div>
                         <div className="flex gap-3 py-2.5 border-b border-[#59D8C3]/10 last:border-0">
                           <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#59D8C3]" />
                           <div>
-                            <p className="text-xs text-white">سارا محمدی پیام جدیدی فرستاد</p>
-                            <p className="text-[10px] text-gray-500 mt-0.5">۱۲ دقیقه پیش</p>
+                            <p className="text-xs text-white">
+                              سارا محمدی پیام جدیدی فرستاد
+                            </p>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              ۱۲ دقیقه پیش
+                            </p>
                           </div>
                         </div>
                         <div className="flex gap-3 py-2.5 border-b border-[#59D8C3]/10 last:border-0">
                           <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#5BE0A8]" />
                           <div>
-                            <p className="text-xs text-white">تیکت #SUP-1044 بسته شد</p>
-                            <p className="text-[10px] text-gray-500 mt-0.5">۱ ساعت پیش</p>
+                            <p className="text-xs text-white">
+                              تیکت #SUP-1044 بسته شد
+                            </p>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              ۱ ساعت پیش
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -242,7 +287,9 @@ const handleLogout = () => {
                   className="w-8 h-8 rounded-full object-cover border-2 border-[#59D8C3]"
                 />
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-medium text-white">{userInfo.name}</p>
+                  <p className="text-sm font-medium text-white">
+                    {userInfo.name}
+                  </p>
                   <p className="text-xs text-[#59D8C3]">{userInfo.role}</p>
                 </div>
                 <ChevronDown
@@ -268,8 +315,12 @@ const handleLogout = () => {
                           className="w-10 h-10 rounded-full object-cover border-2 border-[#59D8C3]"
                         />
                         <div>
-                          <p className="text-sm font-medium text-white">{userInfo.name}</p>
-                          <p className="text-xs text-[#59D8C3]">{userInfo.role}</p>
+                          <p className="text-sm font-medium text-white">
+                            {userInfo.name}
+                          </p>
+                          <p className="text-xs text-[#59D8C3]">
+                            {userInfo.role}
+                          </p>
                         </div>
                       </div>
                     </div>

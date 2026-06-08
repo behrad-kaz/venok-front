@@ -1,0 +1,95 @@
+"use client";
+
+import Link from "next/link";
+
+export interface DepartmentMember {
+  id: number;
+  name: string;
+  initials: string;
+  answeredTickets: number;
+  avgResponseTime: string;
+  openTickets: number;
+  lastActivity: string;
+  status: "active" | "inactive";
+}
+
+interface DepartmentMembersTableProps {
+  members: DepartmentMember[];
+}
+
+export default function DepartmentMembersTable({ members }: DepartmentMembersTableProps) {
+  return (
+    <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-base font-bold text-white">عملکرد اعضای دپارتمان</h3>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[rgba(255,255,255,0.1)]">
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-500">عضو</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-500">گفتگوهای پاسخ‌داده‌شده</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-500">میانگین زمان پاسخ</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-500">گفتگوهای باز</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-500">آخرین فعالیت</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-500">وضعیت</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-500"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((member) => (
+              <tr
+                key={member.id}
+                className="border-b border-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.02)] transition-colors"
+              >
+                <td className="py-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <span className="relative inline-flex flex-shrink-0">
+                      <span className="rounded-xl inline-flex items-center justify-center font-semibold bg-[rgba(89,216,195,0.14)] text-[#59D8C3] border border-[rgba(89,216,195,0.2)] w-7 h-7 text-[10px]">
+                        {member.initials}
+                      </span>
+                    </span>
+                    <span className="text-white font-medium">{member.name}</span>
+                  </div>
+                </td>
+                <td className="py-3 px-4">
+                  <span className="text-white">{member.answeredTickets}</span>
+                </td>
+                <td className="py-3 px-4">
+                  <span className="text-white">{member.avgResponseTime}</span>
+                </td>
+                <td className="py-3 px-4">
+                  <span className="text-white">{member.openTickets}</span>
+                </td>
+                <td className="py-3 px-4">
+                  <span className="text-gray-500">{member.lastActivity}</span>
+                </td>
+                <td className="py-3 px-4">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border font-medium px-2.5 py-1 text-xs ${
+                    member.status === "active"
+                      ? "bg-[rgba(91,224,168,0.12)] text-[#5be0a8] border-[rgba(91,224,168,0.28)]"
+                      : "bg-[rgba(111,136,128,0.12)] text-gray-400 border-[rgba(111,136,128,0.22)]"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      member.status === "active" ? "bg-[#5be0a8]" : "bg-gray-500"
+                    }`} />
+                    {member.status === "active" ? "فعال" : "غیرفعال"}
+                  </span>
+                </td>
+                <td className="py-3 px-4">
+                  <Link
+                    href={`/dashboard/conversations?member=${member.id}`}
+                    className="text-xs font-medium text-[#59D8C3] hover:text-[#6ef3dc] transition-colors"
+                  >
+                    مشاهده گفتگوها
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

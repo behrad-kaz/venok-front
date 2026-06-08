@@ -1,54 +1,52 @@
-// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
-  // دریافت نقش از کوکی
+  // دریافت نقش از کوکی (حالا مقدار انگلیسی است)
   const userRole = request.cookies.get("userRole")?.value;
   const isLoggedIn = request.cookies.get("isLoggedIn")?.value === "true";
   const hasSeenOnboarding = request.cookies.get("hasSeenOnboarding")?.value === "true";
   
-  // مسیر onboarding - اجازه دسترسی
+  // مسير onboarding - اجازه دسترسي
   if (pathname === "/onboarding") {
-    // اگر قبلاً onboarding را دیده یا لاگین نیست، ریدایرکت به لاگین
     if (hasSeenOnboarding || !isLoggedIn) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
     return NextResponse.next();
   }
   
-  // مسیر success - اجازه دسترسی بدون بررسی
+  // مسير success - اجازه دسترسي بدون بررسي
   if (pathname === "/onboarding/success") {
     return NextResponse.next();
   }
 
-  // اگر در مسیر onboarding نیست ولی مدیر کل است و onboarding را ندیده
-  if (userRole === "مدیر کل" && !hasSeenOnboarding && isLoggedIn && 
+  // اگر در مسير onboarding نيست ولي مدير كل است و onboarding را نديده
+  if (userRole === "super_admin" && !hasSeenOnboarding && isLoggedIn && 
       pathname !== "/onboarding" && pathname !== "/onboarding/success") {
     return NextResponse.redirect(new URL("/onboarding", request.url));
   }
 
-  // اگر لاگین نیست و به مسیر داشبورد می‌خواهد برود
+  // اگر لاگين نيست و به مسير داشبورد ميخواهد برود
   if (!isLoggedIn && pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // تعریف مسیرهای مجاز برای هر نقش
+  // تعريف مسيرهاي مجاز براي هر نقش
   const adminOnlyPaths = ["/dashboard/departments", "/dashboard/settings"];
   const managerOnlyPaths = ["/dashboard/reports"];
   
-  // بررسی دسترسی مدیر کل
+  // بررسي دسترسي مدير كل (super_admin)
   if (adminOnlyPaths.some(path => pathname.startsWith(path))) {
-    if (userRole !== "مدیر کل") {
+    if (userRole !== "super_admin") {
       return NextResponse.redirect(new URL("/dashboard/unauthorized", request.url));
     }
   }
 
-  // بررسی دسترسی مدیر
+  // بررسي دسترسي مدير (manager و super_admin)
   if (managerOnlyPaths.some(path => pathname.startsWith(path))) {
-    if (userRole !== "مدیر کل" && userRole !== "مدیر") {
+    if (userRole !== "super_admin" && userRole !== "manager") {
       return NextResponse.redirect(new URL("/dashboard/unauthorized", request.url));
     }
   }
@@ -57,5 +55,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-   matcher: ["/dashboard/:path*", "/onboarding", "/onboarding/success", "/onboarding/workspace"],
+  matcher: ["/dashboard/:path*", "/onboarding", "/onboarding/success", "/onboarding/workspace"],
 };
