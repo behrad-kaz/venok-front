@@ -29,6 +29,8 @@ interface HeaderProps {
 
 // تابع دریافت عنوان صفحه با دریافت role به عنوان پارامتر
 const getPageTitle = (pathname: string, role?: UserRole): string => {
+  if (pathname === "/dashboard/workspace-settings") return "تنظیمات Workspace";
+  if (pathname === "/dashboard/widget") return "ویجت سایت";
   if (pathname === "/dashboard/my-conversations") return "گفتگوهای من";
   if (pathname === "/dashboard") return "داشبورد";
   if (pathname === "/dashboard/requests") return "درخواست‌ها";

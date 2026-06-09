@@ -52,16 +52,18 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main className="flex-1 overflow-y-auto rtl-scrollbar p-6">
-      <div
-        className="min-h-screen bg-gradient-to-br from-[#0a3d35] to-[#050f0d] relative overflow-hidden"
-        dir="rtl"
-      >
-        {/* پس‌زمینه با جلوه‌های بصری */}
-        <div className="absolute inset-0 opacity-10">
+    
+    <main className="flex-1 overflow-y-auto  rtl-scrollbar p-6">
+              <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-[#59d8c3] to-transparent" />
           <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-[#59d8c3] rounded-full blur-[150px]" />
         </div>
+
+      <div
+        className="min-h-screen  relative overflow-hidden"
+        dir="rtl"
+      >
+        {/* پس‌زمینه با جلوه‌های بصری */}
 
         <div className="relative z-10 min-h-screen flex">
           {/* بخش چپ - توضیحات */}

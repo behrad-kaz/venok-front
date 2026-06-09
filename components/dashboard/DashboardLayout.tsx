@@ -12,10 +12,12 @@ import {
   FileText,
   Settings,
   ChevronLeft,
+  ChevronRight,
   Headphones,
   X,
   Code,
   Shield,
+  Menu,
 } from "lucide-react";
 import Header from "../layout/Header";
 import { useRoleStore } from "@/stores/useRoleStore";
@@ -40,7 +42,7 @@ const adminMenuItems: MenuItem[] = [
   { id: "members", title: "اعضا", icon: Users, href: "/dashboard/members" },
   { id: "reports", title: "گزارشات", icon: FileText, href: "/dashboard/reports" },
   { id: "widget", title: "ویجت سایت", icon: Code, href: "/dashboard/widget" },
-  { id: "workspace", title: "تنظیمات Workspace", icon: Settings, href: "/dashboard/settings" },
+  { id: "workspace", title: "تنظیمات Workspace", icon: Settings, href: "/dashboard/workspace-settings" },
 ];
 
 // منوی مدیر دپارتمان
@@ -62,6 +64,36 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { role } = useRoleStore();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // اطلاعات شرکت از localStorage
+  const [companyName, setCompanyName] = useState("آژانس سفر نمونه");
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [companyDescription, setCompanyDescription] = useState("پنل پشتیبانی مشتریان");
+
+  // خواندن اطلاعات شرکت از localStorage
+  useEffect(() => {
+    const savedCompanyName = localStorage.getItem("companyName");
+    const savedCompanyLogo = localStorage.getItem("companyLogo");
+    const savedCompanyDescription = localStorage.getItem("companyDescription");
+    
+    if (savedCompanyName) setCompanyName(savedCompanyName);
+    if (savedCompanyLogo) setCompanyLogo(savedCompanyLogo);
+    if (savedCompanyDescription) setCompanyDescription(savedCompanyDescription);
+  }, []);
+
+  // ذخیره وضعیت سایدبار در localStorage
+  useEffect(() => {
+    const savedState = localStorage.getItem("sidebarCollapsed");
+    if (savedState !== null) {
+      setIsSidebarCollapsed(savedState === "true");
+    }
+  }, []);
+
+  const toggleSidebar = () => {
+    const newState = !isSidebarCollapsed;
+    setIsSidebarCollapsed(newState);
+    localStorage.setItem("sidebarCollapsed", String(newState));
+  };
 
   const getMenuItems = (): MenuItem[] => {
     if (role === "مدیر کل") return adminMenuItems;
@@ -102,16 +134,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const SidebarContent = () => (
     <>
-      {/* لوگو و نام شرکت */}
+      {/* لوگو و نام شرکت - در حالت کوچک فقط لوگو */}
       <div className="p-5 border-b border-[rgba(255,255,255,0.1)]">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center flex-shrink-0">
-            <Headphones className="w-5 h-5 text-[#59D8C3]" />
+        <div className="flex items-center justify-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {companyLogo ? (
+              <img src={companyLogo} alt="logo" className="w-full h-full object-cover" />
+            ) : (
+              <Headphones className="w-5 h-5 text-[#59D8C3]" />
+            )}
           </div>
           {!isSidebarCollapsed && (
             <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-bold text-white truncate">آژانس سفر نمونه</h2>
-              <p className="text-xs text-gray-500 truncate">پنل پشتیبانی مشتریان</p>
+              <h2 className="text-sm font-bold text-white truncate">{companyName}</h2>
+              <p className="text-xs text-gray-500 truncate">{companyDescription}</p>
             </div>
           )}
         </div>
@@ -128,13 +164,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 key={item.id}
                 href={item.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative group ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-3xl text-sm font-medium transition-all relative group ${
                   isActive
                     ? "bg-[rgba(89,216,195,0.12)] text-[#59D8C3] border border-[rgba(89,216,195,0.2)] shadow-[0_0_20px_rgba(89,216,195,0.15)]"
                     : "text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.04)] border border-transparent hover:border-[rgba(255,255,255,0.1)]"
                 }`}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon className="w-5 h-5 flex-shrink-0" />
                 {!isSidebarCollapsed && (
                   <>
                     <span className="flex-1 text-right truncate">{item.title}</span>
@@ -151,14 +187,33 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       </nav>
 
-      {/* فوتر سایدبار */}
-      <div className="p-3 border-t border-[rgba(255,255,255,0.1)]">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl">
-          <Shield className="w-3 h-3 text-gray-600" />
-          {!isSidebarCollapsed && (
+      {/* فوتر سایدبار با دکمه Collapse/Expand */}
+      <div className="flex justify-between p-3 border-t border-[rgba(255,255,255,0.1)]">
+        
+        
+        {/* نسخه در حالت باز */}
+        {!isSidebarCollapsed && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl">
+            <Shield className="w-3 h-3 text-gray-600" />
             <span className="text-[10px] text-gray-600">نسخه ۱.۰.۰</span>
+          </div>
+        )}
+
+        
+        <button
+          onClick={toggleSidebar}
+          className=" flex items-center justify-center gap-2 p-1  rounded-full text-sm font-medium transition-all text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.04)] border border-transparent hover:border-[rgba(255,255,255,0.1)] group"
+        >
+          {isSidebarCollapsed ? (
+            <>
+              <ChevronLeft className="w-4 h-4" />
+            </>
+          ) : (
+            <>
+              <ChevronRight className="w-4 h-4" />
+            </>
           )}
-        </div>
+        </button>
       </div>
     </>
   );
@@ -169,14 +224,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <motion.aside
         initial={false}
         animate={{ width: isSidebarCollapsed ? "80px" : "280px" }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
         className="fixed right-0 top-0 h-screen z-50 bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border-l border-[rgba(255,255,255,0.1)] hidden md:flex flex-col shadow-2xl"
       >
         <SidebarContent />
       </motion.aside>
 
       {/* محتوای اصلی */}
-      <div className={`transition-all duration-300 ${isSidebarCollapsed ? "md:mr-[80px]" : "md:mr-[280px]"}`}>
+      <div 
+        className={`transition-all duration-300 ${
+          isSidebarCollapsed ? "md:mr-[80px]" : "md:mr-[280px]"
+        }`}
+      >
         <Header onMenuClick={() => setIsMobileMenuOpen(true)} isMobileMenuOpen={isMobileMenuOpen} />
         <main className="overflow-auto min-h-screen">
           <div className="p-6">{children}</div>
@@ -205,12 +264,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {/* هدر موبایل */}
               <div className="p-4 border-b border-[rgba(255,255,255,0.1)] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center">
-                    <Headphones className="w-5 h-5 text-[#59D8C3]" />
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center overflow-hidden">
+                    {companyLogo ? (
+                      <img src={companyLogo} alt="logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <Headphones className="w-5 h-5 text-[#59D8C3]" />
+                    )}
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">آژانس سفر نمونه</h2>
-                    <p className="text-xs text-gray-500">پنل پشتیبانی مشتریان</p>
+                    <h2 className="text-sm font-bold text-white">{companyName}</h2>
+                    <p className="text-xs text-gray-500">{companyDescription}</p>
                   </div>
                 </div>
                 <button
