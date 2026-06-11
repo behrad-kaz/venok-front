@@ -37,7 +37,7 @@ export default function ConversationDetails({
   const isFullWidth = isMobile || isTablet;
 
   return (
-    <div className={`${isFullWidth ? "h-full w-full" : "w-[320px]"} flex-shrink-0 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5 overflow-y-auto animate-fadeInUp`}>
+    <div className={`${isFullWidth ? "h-full w-full" : "w-[320px]"} flex-shrink-0 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-3 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[rgba(255,255,255,0.05)] [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.3)] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.5)] animate-fadeInUp`}>
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
           {showBackButton && (

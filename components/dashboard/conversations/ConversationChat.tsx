@@ -92,7 +92,7 @@ export default function ConversationChat({
       </div>
 
       {/* پیام‌ها */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[rgba(255,255,255,0.05)] [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.3)] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.5)] p-4 space-y-4">
         {conversation.messages.map((msg) => (
           <div key={msg.id} className={`flex gap-3 ${msg.isSupport ? "flex-row-reverse" : "flex-row"}`}>
             <div className="flex flex-col max-w-[85%]">
