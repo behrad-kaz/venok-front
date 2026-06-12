@@ -22,49 +22,70 @@ export default function OnboardingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsLoading(true);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError("");
+  setIsLoading(true);
 
-    // شبیه‌سازی درخواست به سرور
-    setTimeout(() => {
-      // بررسی اعتبار (admin/admin123 برای مدیر کل)
-      if (username === "admin" && password === "admin123") {
-        // ذخیره کردن که مدیر کل onboarding را دیده است
-        localStorage.setItem("hasSeenOnboarding", "true");
-        localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("userRole", "مدیر کل");
-        localStorage.setItem("userRoleEnglish", "super_admin");
+  console.log("🔄 ارسال درخواست به پروکسی Next.js...");
 
-        // تنظیم کوکی برای middleware با مقدار انگلیسی
-        document.cookie = `isLoggedIn=true; path=/; max-age=${60 * 60 * 24 * 7}`;
-        document.cookie = `userRole=super_admin; path=/; max-age=${60 * 60 * 24 * 7}`;
-        document.cookie = `hasSeenOnboarding=true; path=/; max-age=${60 * 60 * 24 * 7}`;
+  try {
+    // استفاده از پروکسی به جای سرور مستقیم
+    const response = await fetch("/api/auth/user/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username: username,
+        password: password,
+      }),
+    });
 
-        // ریدایرکت به صفحه موفقیت
-        router.push("/onboarding/success");
-      } else {
-        setError("نام کاربری یا رمز عبور اشتباه است");
-        setIsLoading(false);
-      }
-    }, 800);
-  };
+    console.log("✅ وضعیت پاسخ:", response.status);
+    
+    const data = await response.json();
+    console.log("📦 دیتای پاسخ:", data);
+
+    if (response.ok && data.success) {
+      console.log("🎉 ورود موفق!");
+      
+      localStorage.setItem("hasSeenOnboarding", "true");
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("userRole", data.data?.role || "مدیر کل");
+      localStorage.setItem("userRoleEnglish", data.data?.roleEnglish || "super_admin");
+      localStorage.setItem("userName", data.data?.name || "");
+      localStorage.setItem("userToken", data.data?.token || "");
+
+      const maxAge = 60 * 60 * 24 * 7;
+      document.cookie = `isLoggedIn=true; path=/; max-age=${maxAge}`;
+      document.cookie = `userRole=${data.data?.roleEnglish || "super_admin"}; path=/; max-age=${maxAge}`;
+      document.cookie = `hasSeenOnboarding=true; path=/; max-age=${maxAge}`;
+      document.cookie = `userToken=${data.data?.token || ""}; path=/; max-age=${maxAge}`;
+
+      router.push("/onboarding/success");
+    } else {
+      setError(data.message || "نام کاربری یا رمز عبور اشتباه است");
+      setIsLoading(false);
+    }
+  } catch (err) {
+    console.error("❌ خطا:", err);
+    setError("مشکلی در ارتباط با سرور پیش آمده است. لطفاً دوباره تلاش کنید.");
+    setIsLoading(false);
+  }
+};
 
   return (
-    
-    <main className="flex-1 overflow-y-auto  rtl-scrollbar p-6">
-              <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-[#59d8c3] to-transparent" />
-          <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-[#59d8c3] rounded-full blur-[150px]" />
-        </div>
+    <main className="flex-1 overflow-y-auto rtl-scrollbar p-6">
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-[#59d8c3] to-transparent" />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-[#59d8c3] rounded-full blur-[150px]" />
+      </div>
 
       <div
-        className="min-h-screen  relative overflow-hidden"
+        className="min-h-screen relative overflow-hidden"
         dir="rtl"
       >
-        {/* پس‌زمینه با جلوه‌های بصری */}
-
         <div className="relative z-10 min-h-screen flex">
           {/* بخش چپ - توضیحات */}
           <div className="hidden lg:flex lg:w-1/2 xl:w-2/5 items-center justify-center p-12">
