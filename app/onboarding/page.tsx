@@ -12,6 +12,18 @@ import {
   BarChart3,
   CheckCircle,
 } from "lucide-react";
+import { authService } from '@/services/auth.service';
+
+// تعریف تایپ برای خطا
+interface ApiError {
+  message?: string;
+  status?: number;
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -22,58 +34,49 @@ export default function OnboardingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError("");
-  setIsLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
 
-  console.log("🔄 ارسال درخواست به پروکسی Next.js...");
-
-  try {
-    // استفاده از پروکسی به جای سرور مستقیم
-    const response = await fetch("/api/auth/user/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username: username,
-        password: password,
-      }),
-    });
-
-    console.log("✅ وضعیت پاسخ:", response.status);
-    
-    const data = await response.json();
-    console.log("📦 دیتای پاسخ:", data);
-
-    if (response.ok && data.success) {
-      console.log("🎉 ورود موفق!");
+    try {
+      // ذخیره موقت اطلاعات برای صفحه success
+      localStorage.setItem("loginUsername", username);
+      localStorage.setItem("loginPassword", password);
       
-      localStorage.setItem("hasSeenOnboarding", "true");
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userRole", data.data?.role || "مدیر کل");
-      localStorage.setItem("userRoleEnglish", data.data?.roleEnglish || "super_admin");
-      localStorage.setItem("userName", data.data?.name || "");
-      localStorage.setItem("userToken", data.data?.token || "");
-
-      const maxAge = 60 * 60 * 24 * 7;
-      document.cookie = `isLoggedIn=true; path=/; max-age=${maxAge}`;
-      document.cookie = `userRole=${data.data?.roleEnglish || "super_admin"}; path=/; max-age=${maxAge}`;
-      document.cookie = `hasSeenOnboarding=true; path=/; max-age=${maxAge}`;
-      document.cookie = `userToken=${data.data?.token || ""}; path=/; max-age=${maxAge}`;
-
+      // استفاده از سرویس لاگین
+      const loginResponse = await authService.login(username, password);
+      
+      console.log("✅ لاگین موفق:", loginResponse);
+      
+      // ذخیره اطلاعات
+      authService.storeUserData(loginResponse, username);
+      
+      console.log("💾 اطلاعات ذخیره شد");
+      
+      // ریدایرکت به صفحه موفقیت (پردازش سوییچ در آنجا انجام می‌شود)
       router.push("/onboarding/success");
-    } else {
-      setError(data.message || "نام کاربری یا رمز عبور اشتباه است");
+      
+    } catch (err: unknown) {
+      console.error("❌ خطا:", err);
+      
+      // بررسی نوع خطا و استخراج پیام مناسب
+      let errorMessage = "نام کاربری یا رمز عبور اشتباه است";
+      
+      if (err && typeof err === 'object') {
+        const apiError = err as ApiError;
+        
+        if (apiError.message) {
+          errorMessage = apiError.message;
+        } else if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message;
+        }
+      }
+      
+      setError(errorMessage);
       setIsLoading(false);
     }
-  } catch (err) {
-    console.error("❌ خطا:", err);
-    setError("مشکلی در ارتباط با سرور پیش آمده است. لطفاً دوباره تلاش کنید.");
-    setIsLoading(false);
-  }
-};
+  };
 
   return (
     <main className="flex-1 overflow-y-auto rtl-scrollbar p-6">

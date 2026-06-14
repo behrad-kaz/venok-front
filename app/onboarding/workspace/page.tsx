@@ -31,7 +31,7 @@ const steps: Step[] = [
 
 export default function WorkspaceSetupPage() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(4); 
+  const [currentStep, setCurrentStep] = useState(1); 
 
   const [formData, setFormData] = useState<CompanyData>({
     companyName: "آژانس سفر نمونه",

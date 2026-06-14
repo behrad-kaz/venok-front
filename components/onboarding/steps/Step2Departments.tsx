@@ -1,4 +1,3 @@
-// components/onboarding/steps/Step2Departments.tsx
 "use client";
 
 import { useState } from "react";
@@ -58,6 +57,12 @@ export default function Step2Departments({
       onSaveEdit(localEditingDept);
       setLocalEditingDept(null);
     }
+  };
+
+  const handleCancelEdit = () => {
+    // پاک کردن state محلی و فراخوانی onCancelEdit
+    setLocalEditingDept(null);
+    onCancelEdit();
   };
 
   const handleEditClick = (dept: Department) => {
@@ -177,8 +182,18 @@ export default function Step2Departments({
               <span className="text-xs text-gray-400">فعال</span>
             </label>
             <div className="flex gap-2">
-              <button onClick={onCancelEdit} className="px-3 py-1.5 rounded-xl text-xs font-medium text-gray-400 hover:text-white">انصراف</button>
-              <button onClick={handleSaveEdit} className="px-3 py-1.5 rounded-xl text-xs font-medium bg-[rgba(255,255,255,0.05)] border text-white hover:border-[#59D8C3]/40">ذخیره تغییرات</button>
+              <button 
+                onClick={handleCancelEdit} 
+                className="px-3 py-1.5 rounded-xl text-xs font-medium text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
+              >
+                انصراف
+              </button>
+              <button 
+                onClick={handleSaveEdit} 
+                className="px-3 py-1.5 rounded-xl text-xs font-medium bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] hover:shadow-lg transition-all"
+              >
+                ذخیره تغییرات
+              </button>
             </div>
           </div>
         </div>
@@ -199,13 +214,25 @@ export default function Step2Departments({
                 {dept.description && <p className="text-xs text-gray-500">{dept.description}</p>}
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => onToggleStatus(dept.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white" title={dept.isActive ? "غیرفعال کردن" : "فعال کردن"}>
+                <button 
+                  onClick={() => onToggleStatus(dept.id)} 
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all" 
+                  title={dept.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                >
                   {dept.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
-                <button onClick={() => handleEditClick(dept)} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white" title="ویرایش">
+                <button 
+                  onClick={() => handleEditClick(dept)} 
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all" 
+                  title="ویرایش"
+                >
                   <Edit2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => onRemoveDepartment(dept.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-400" title="حذف">
+                <button 
+                  onClick={() => onRemoveDepartment(dept.id)} 
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-[rgba(255,107,107,0.05)] transition-all" 
+                  title="حذف"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

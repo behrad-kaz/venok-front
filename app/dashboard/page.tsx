@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import DepartmentDashboard from "@/components/dashboard/DepartmentDashboard";
@@ -15,26 +15,37 @@ import WorkspaceStatus from "@/components/dashboard/admin/WorkspaceStatus";
 import DepartmentsTable from "@/components/dashboard/admin/DepartmentsTable";
 import RecentConversations from "@/components/dashboard/admin/RecentConversations";
 
+type UserRole = "مدیر کل" | "مدیر" | "کارمند";
+
+// تابع subscribe برای localStorage
+const subscribeToLocalStorage = (callback: () => void) => {
+  window.addEventListener('storage', callback);
+  window.addEventListener('roleChanged', callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener('roleChanged', callback);
+  };
+};
+
+const getSavedRole = (): UserRole | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem("userRole") as UserRole | null;
+};
+
 export default function DashboardPage() {
   const { role, setRole } = useRoleStore();
   const router = useRouter();
-  const [isClient, setIsClient] = useState(false);
   const [dateRange, setDateRange] = useState("today");
-
+  
+  // استفاده از useSyncExternalStore برای همگام‌سازی خودکار با localStorage
+  const savedRole = useSyncExternalStore(subscribeToLocalStorage, getSavedRole, () => null);
+  
+  // همگام‌سازی نقش ذخیره شده با store
   useEffect(() => {
-    setIsClient(true);
-    const savedRole = localStorage.getItem("userRole") as any;
     if (savedRole && savedRole !== role) {
       setRole(savedRole);
     }
-  }, []);
-
-  // اگر کارمند است، به صفحه گفتگوهای من ریدایرکت شود
-  useEffect(() => {
-    if (isClient && role === "کارمند") {
-      router.push("/dashboard/my-conversations");
-    }
-  }, [isClient, role, router]);
+  }, [savedRole, role, setRole]);
 
   const statsData = {
     openConversations: 24,
@@ -43,15 +54,12 @@ export default function DashboardPage() {
     solvedToday: 15,
   };
 
-  if (!isClient) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-pulse text-white">در حال بارگذاری...</div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  // اگر کارمند است، به صفحه گفتگوهای من ریدایرکت شود
+  useEffect(() => {
+    if (role === "کارمند") {
+      router.push("/dashboard/my-conversations");
+    }
+  }, [role, router]);
 
   // نمایش داشبورد مخصوص مدیر دپارتمان
   if (role === "مدیر") {
@@ -71,7 +79,6 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="space-y-5">
-        {/* ... کد داشبورد مدیر کل ... */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-white">داشبورد</h2>
