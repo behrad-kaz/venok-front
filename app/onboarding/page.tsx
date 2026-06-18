@@ -265,16 +265,6 @@ export default function OnboardingPage() {
                       "ورود "
                     )}
                   </button>
-
-                  {/* حساب‌های دمو */}
-                  <div className="pt-4 border-t border-[rgba(255,255,255,0.1)]">
-                    <p className="text-xs text-gray-500 mb-2">حساب‌های دمو:</p>
-                    <div className="space-y-1 text-xs text-gray-400">
-                      <p> Admin: admin / admin123</p>
-                      <p> Manager: manager.support / manager123</p>
-                      <p> Staff: staff.ali / staff123</p>
-                    </div>
-                  </div>
                 </form>
               </div>
             </motion.div>

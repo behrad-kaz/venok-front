@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,13 +37,11 @@ const getPageTitle = (pathname: string, role?: UserRole): string => {
   if (pathname === "/dashboard/conversations") return "گفتگوها";
   if (pathname === "/dashboard/departments") return "دپارتمان‌ها";
   
-  // صفحه اعضا بر اساس نقش
   if (pathname === "/dashboard/members") {
     if (role === "مدیر") return "اعضای دپارتمان";
     return "اعضا";
   }
   
-  // صفحه گزارشات بر اساس نقش
   if (pathname === "/dashboard/reports") {
     if (role === "مدیر") return "گزارشات دپارتمان";
     if (role === "کارمند") return "گزارشات من";
@@ -67,7 +65,17 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [hasNotification, setHasNotification] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  // استفاده از useRef برای tracking mounted state
+  const isMounted = useRef(true);
+
+  // خواندن وضعیت لاگین از localStorage به صورت مستقیم در useState
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("isLoggedIn") === "true";
+    }
+    return false;
+  });
 
   const userInfo: UserInfo = {
     name: selectedRole === "مدیر" ? "سارا محمدی" : selectedRole === "کارمند" ? "علی احمدی" : "مریم رضایی",
@@ -77,16 +85,54 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
 
   const roles: UserRole[] = ["مدیر کل", "مدیر", "کارمند"];
 
-  useEffect(() => {
-    const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-    setIsLoggedIn(loggedIn);
-
-    // خواندن نقش فارسی از localStorage
-    const savedRole = localStorage.getItem("userRole");
-    if (savedRole && savedRole !== selectedRole) {
-      setSelectedRole(savedRole as UserRole);
+  // تابع همگام‌سازی با localStorage
+  const syncAuthState = useCallback(() => {
+    if (typeof window !== 'undefined' && isMounted.current) {
+      const loggedIn = localStorage.getItem("isLoggedIn") === "true";
+      setIsLoggedIn(loggedIn);
+      
+      const savedRole = localStorage.getItem("userRole");
+      if (savedRole && savedRole !== selectedRole) {
+        setSelectedRole(savedRole as UserRole);
+      }
     }
-  }, []);
+  }, [selectedRole, setSelectedRole]);
+
+  // استفاده از useEffect فقط برای subscribe کردن به رویدادها
+  useEffect(() => {
+    isMounted.current = true;
+
+    // گوش دادن به رویداد storage (برای تغییرات از تب‌های دیگر)
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "isLoggedIn" || event.key === "userRole") {
+        // استفاده از setTimeout برای جلوگیری از setState مستقیم در اثر
+        setTimeout(() => {
+          syncAuthState();
+        }, 0);
+      }
+    };
+
+    // گوش دادن به رویداد سفارشی برای تغییرات در همان تب
+    const handleAuthChange = () => {
+      setTimeout(() => {
+        syncAuthState();
+      }, 0);
+    };
+
+    // همگام‌سازی اولیه با setTimeout
+    setTimeout(() => {
+      syncAuthState();
+    }, 0);
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('authChange', handleAuthChange);
+    
+    return () => {
+      isMounted.current = false;
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('authChange', handleAuthChange);
+    };
+  }, [syncAuthState]);
 
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
@@ -98,15 +144,25 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
     localStorage.removeItem("userRole");
     localStorage.removeItem("userName");
     localStorage.removeItem("hasSeenOnboarding");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("contextToken");
+    localStorage.removeItem("x-context-token");
 
     // حذف کوکی‌ها
-    document.cookie =
-      "isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-    document.cookie =
-      "userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-    document.cookie =
-      "hasSeenOnboarding=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    document.cookie = "isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    document.cookie = "userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    document.cookie = "hasSeenOnboarding=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    document.cookie = "accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    document.cookie = "contextToken=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
 
+    setIsLoggedIn(false);
+    
+    // Dispatch رویداد برای همگام‌سازی
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('authChange'));
+    }
+    
     router.push("/login");
   };
 
@@ -118,7 +174,6 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
     router.push("/dashboard/profile");
   };
 
-  // دریافت عنوان صفحه با پاس دادن selectedRole
   const pageTitle = getPageTitle(pathname, selectedRole);
   const isDashboardPage = pathname?.startsWith("/dashboard");
 

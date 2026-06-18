@@ -14,6 +14,19 @@ interface ApiError {
   };
 }
 
+// تعریف تایپ برای پاسخ سوییچ
+interface SwitchResponse {
+  contextToken: string;
+}
+
+// تعریف تایپ برای پاسخ سوییچ با توکن (در صورت وجود)
+interface SwitchResponseWithToken extends SwitchResponse {
+  token?: {
+    accessToken: string;
+    refreshToken: string;
+  };
+}
+
 export default function OnboardingSuccessPage() {
   const router = useRouter();
   const [countdown, setCountdown] = useState(3);
@@ -60,6 +73,8 @@ export default function OnboardingSuccessPage() {
           hasWorkspace: !!defaultWorkspace
         });
         
+        let contextToken: string | null = null;
+        
         // تنظیم هدر Authorization برای درخواست سوییچ
         try {
           const switchResponse = await fetch("http://localhost:3001/account/context/switch", {
@@ -76,12 +91,28 @@ export default function OnboardingSuccessPage() {
           });
           
           if (switchResponse.ok || switchResponse.status === 200 || switchResponse.status === 201) {
-            const switchData = await switchResponse.json();
+            const switchData = await switchResponse.json() as SwitchResponseWithToken;
             console.log("✅ سوییچ موفق:", switchData);
             
+            // ذخیره contextToken
+            if (switchData?.contextToken) {
+              contextToken = switchData.contextToken;
+              localStorage.setItem("contextToken", contextToken);
+              localStorage.setItem("x-context-token", contextToken);
+              
+              // ذخیره در کوکی برای middleware
+              const maxAge = 60 * 60 * 24 * 7;
+              document.cookie = `contextToken=${contextToken}; path=/; max-age=${maxAge}`;
+              document.cookie = `x-context-token=${contextToken}; path=/; max-age=${maxAge}`;
+              
+              console.log("✅ contextToken ذخیره شد:", contextToken);
+            }
+            
+            // به‌روزرسانی توکن در صورت وجود
             if (switchData?.token) {
               localStorage.setItem("accessToken", switchData.token.accessToken);
               localStorage.setItem("refreshToken", switchData.token.refreshToken);
+              console.log("✅ توکن به‌روزرسانی شد");
             }
           } else {
             console.warn("⚠️ سوییچ با خطا مواجه شد، اما ادامه می‌دهیم");
@@ -162,7 +193,7 @@ export default function OnboardingSuccessPage() {
       "isLoggedIn", "userRole", "hasSeenOnboarding", "userRoleEnglish",
       "userName", "userToken", "refreshToken", "userId", "userPhone",
       "accessToken", "organizations", "currentOrganizationId", "currentWorkspaceId",
-      "loginUsername", "loginPassword"
+      "loginUsername", "loginPassword", "contextToken", "x-context-token"
     ];
     
     keysToRemove.forEach(key => localStorage.removeItem(key));

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import RoleGuard from "@/components/dashboard/RoleGuard";
 import WidgetTabs from "@/components/dashboard/widget/WidgetTabs";
@@ -39,11 +39,9 @@ export default function WidgetPage() {
   
   // وضعیت ویجت
   const [widgetStatus, setWidgetStatus] = useState<WidgetStatus>(initialWidgetStatus);
-  const [hasStatusChanges, setHasStatusChanges] = useState(false);
 
   // تنظیمات ظاهری ویجت
   const [widgetAppearance, setWidgetAppearance] = useState<WidgetAppearance>(initialWidgetAppearance);
-  const [hasAppearanceChanges, setHasAppearanceChanges] = useState(false);
 
   // تنظیمات فرم (در حالت واقعی از stateهای داخل WidgetFormTab می‌آید)
   const [hasFormChanges, setHasFormChanges] = useState(false);
@@ -51,13 +49,13 @@ export default function WidgetPage() {
   // تنظیمات مسیر ارجاع (در حالت واقعی از stateهای داخل WidgetReferrerTab می‌آید)
   const [hasReferrerChanges, setHasReferrerChanges] = useState(false);
 
-  // بررسی تغییرات
-  useEffect(() => {
-    setHasStatusChanges(JSON.stringify(initialWidgetStatus) !== JSON.stringify(widgetStatus));
+  // محاسبه تغییرات با useMemo (بدون نیاز به useEffect)
+  const hasStatusChanges = useMemo(() => {
+    return JSON.stringify(initialWidgetStatus) !== JSON.stringify(widgetStatus);
   }, [widgetStatus]);
 
-  useEffect(() => {
-    setHasAppearanceChanges(JSON.stringify(initialWidgetAppearance) !== JSON.stringify(widgetAppearance));
+  const hasAppearanceChanges = useMemo(() => {
+    return JSON.stringify(initialWidgetAppearance) !== JSON.stringify(widgetAppearance);
   }, [widgetAppearance]);
 
   const hasAnyChanges = hasStatusChanges || hasAppearanceChanges || hasFormChanges || hasReferrerChanges;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import RoleGuard from "@/components/dashboard/RoleGuard";
 import { useRoleStore } from "@/stores/useRoleStore";
@@ -60,45 +60,37 @@ export default function DepartmentSettingsPage() {
 
   // اطلاعات دپارتمان
   const [departmentInfo, setDepartmentInfo] = useState<DepartmentInfo>(initialDepartmentInfo);
-  const [hasInfoChanges, setHasInfoChanges] = useState(false);
 
   // پیام‌های دپارتمان
   const [messages, setMessages] = useState<DepartmentMessages>(initialMessages);
-  const [hasMessagesChanges, setHasMessagesChanges] = useState(false);
 
   // ساعات پاسخگویی
   const [workingHours, setWorkingHours] = useState<WorkingHours>(initialWorkingHours);
-  const [hasHoursChanges, setHasHoursChanges] = useState(false);
 
   // قوانین ورود گفتگو
   const [routingRule, setRoutingRule] = useState<string>(initialRoutingRule);
-  const [hasRulesChanges, setHasRulesChanges] = useState(false);
 
-  // بررسی تغییرات هر تب
-  useEffect(() => {
-    setHasInfoChanges(JSON.stringify(initialDepartmentInfo) !== JSON.stringify(departmentInfo));
+  // محاسبه تغییرات با useMemo (بدون نیاز به useEffect)
+  const hasInfoChanges = useMemo(() => {
+    return JSON.stringify(initialDepartmentInfo) !== JSON.stringify(departmentInfo);
   }, [departmentInfo]);
 
-  useEffect(() => {
-    setHasMessagesChanges(JSON.stringify(initialMessages) !== JSON.stringify(messages));
+  const hasMessagesChanges = useMemo(() => {
+    return JSON.stringify(initialMessages) !== JSON.stringify(messages);
   }, [messages]);
 
-  useEffect(() => {
-    setHasHoursChanges(JSON.stringify(initialWorkingHours) !== JSON.stringify(workingHours));
+  const hasHoursChanges = useMemo(() => {
+    return JSON.stringify(initialWorkingHours) !== JSON.stringify(workingHours);
   }, [workingHours]);
 
-  useEffect(() => {
-    setHasRulesChanges(initialRoutingRule !== routingRule);
+  const hasRulesChanges = useMemo(() => {
+    return initialRoutingRule !== routingRule;
   }, [routingRule]);
 
   const hasAnyChanges = hasInfoChanges || hasMessagesChanges || hasHoursChanges || hasRulesChanges;
 
   const handleSave = () => {
     console.log("تنظیمات ذخیره شد:", { departmentInfo, messages, workingHours, routingRule });
-    
-    // به‌روزرسانی داده‌های اولیه
-    // در حالت واقعی، اینجا درخواست API زده می‌شود
-    
     alert("تنظیمات با موفقیت ذخیره شد");
   };
 

@@ -5,6 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, User, Lock, Sparkles, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { authService } from '@/services/auth.service';
+
+// تعریف تایپ برای خطا
+interface ApiError {
+  message?: string;
+  status?: number;
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,57 +26,48 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      let role = "";
-      let roleEnglish = "";
-      let name = "";
+    try {
+      // ذخیره موقت اطلاعات برای صفحه success
+      localStorage.setItem("loginUsername", username);
+      localStorage.setItem("loginPassword", password);
       
-      // تشخیص نقش بر اساس نام کاربری
-      if (username === "admin" && password === "123456") {
-        role = "مدیر کل";
-        roleEnglish = "super_admin";
-        name = "مریم رضایی";
-      } else if (username === "manager.support" && password === "manager123") {
-        role = "مدیر";
-        roleEnglish = "manager";
-        name = "سارا محمدی";
-      } else if (username === "staff.ali" && password === "staff123") {
-        role = "کارمند";
-        roleEnglish = "staff";
-        name = "علی احمدی";
-      } else {
-        setError("نام کاربری یا رمز عبور اشتباه است");
-        setIsLoading(false);
-        return;
-      }
-
-      // ذخیره در localStorage با مقدار فارسی (برای نمایش در UI)
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userRole", role); // مقدار فارسی برای نمایش
-      localStorage.setItem("userRoleEnglish", roleEnglish); // مقدار انگلیسی برای کوکی
-      localStorage.setItem("userName", name);
+      // استفاده از سرویس لاگین
+      const loginResponse = await authService.login(username, password);
       
-      // اگر مدیر کل است و هنوز onboarding را ندیده، flag را false بگذار
-      if (role === "مدیر کل") {
-        const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
-        if (!hasSeenOnboarding) {
-          localStorage.setItem("hasSeenOnboarding", "false");
+      console.log("✅ لاگین موفق:", loginResponse);
+      
+      // ذخیره اطلاعات
+      authService.storeUserData(loginResponse, username);
+      
+      console.log("💾 اطلاعات ذخیره شد");
+      
+      // ریدایرکت به صفحه موفقیت (پردازش سوییچ در آنجا انجام می‌شود)
+      router.push("/onboarding/success");
+      
+    } catch (err: unknown) {
+      console.error("❌ خطا:", err);
+      
+      // بررسی نوع خطا و استخراج پیام مناسب
+      let errorMessage = "نام کاربری یا رمز عبور اشتباه است";
+      
+      if (err && typeof err === 'object') {
+        const apiError = err as ApiError;
+        
+        if (apiError.message) {
+          errorMessage = apiError.message;
+        } else if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message;
         }
       }
       
-      // ✅ ذخیره در کوکی با مقدار انگلیسی (بدون نیاز به encodeURIComponent)
-      document.cookie = `isLoggedIn=true; path=/; max-age=${60 * 60 * 24 * 7}`;
-      document.cookie = `userRole=${roleEnglish}; path=/; max-age=${60 * 60 * 24 * 7}`;
-      document.cookie = `hasSeenOnboarding=${role === "مدیر کل" ? "false" : "true"}; path=/; max-age=${60 * 60 * 24 * 7}`;
-
-      router.push("/dashboard");
+      setError(errorMessage);
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -85,7 +88,7 @@ export default function LoginPage() {
       </div>
 
       {/* فرم ورود */}
-      <div className="relative z-10 -mt-20 min-h-screen flex items-center justify-center px-4">
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -105,7 +108,7 @@ export default function LoginPage() {
 
           <div className="bg-[#0D1B17]/90 backdrop-blur-sm border border-[#59D8C3]/20 rounded-2xl p-8 shadow-2xl">
             <div className="mb-4">
-              <h2 className="font-bold">ورود به ورک اسپیس</h2>
+              <h2 className="font-bold text-white">ورود به ورک اسپیس</h2>
               <span className="text-sm text-gray-300">آژانس سفر نمونه</span>
             </div>
 
@@ -139,14 +142,16 @@ export default function LoginPage() {
                     className="w-full bg-[#12251F] text-sm border border-[#59D8C3]/20 rounded-3xl py-3 pr-12 pl-12 text-white placeholder-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
                     required
                   />
-                  <span className="text-xs text-gray-300">رمز عبور خود را فراموش کردید ؟</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3 top-1/3 -translate-y-1/2 text-gray-500 hover:text-[#59D8C3] transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
+                  <div className="absolute left-3 top-1/3 -translate-y-1/2 flex items-center gap-2">
+                    <span className="text-xs text-gray-300 hidden sm:inline">فراموشی رمز؟</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-gray-500 hover:text-[#59D8C3] transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
 

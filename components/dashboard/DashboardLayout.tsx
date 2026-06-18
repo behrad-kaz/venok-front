@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -59,86 +59,36 @@ const staffMenuItems: MenuItem[] = [
   { id: "my-conversations", title: "گفتگوهای من", icon: MessageCircle, href: "/dashboard/my-conversations", badge: 2 },
 ];
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const pathname = usePathname();
-  const { role } = useRoleStore();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // اطلاعات شرکت از localStorage
-  const [companyName, setCompanyName] = useState("آژانس سفر نمونه");
-  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
-  const [companyDescription, setCompanyDescription] = useState("پنل پشتیبانی مشتریان");
+// کامپوننت SidebarContent به صورت جداگانه و خارج از کامپوننت اصلی
+interface SidebarContentProps {
+  isSidebarCollapsed: boolean;
+  menuItems: MenuItem[];
+  pathname: string;
+  companyName: string;
+  companyLogo: string | null;
+  companyDescription: string;
+  toggleSidebar: () => void;
+  onMenuItemClick: () => void;
+}
 
-  // خواندن اطلاعات شرکت از localStorage
-  useEffect(() => {
-    const savedCompanyName = localStorage.getItem("companyName");
-    const savedCompanyLogo = localStorage.getItem("companyLogo");
-    const savedCompanyDescription = localStorage.getItem("companyDescription");
-    
-    if (savedCompanyName) setCompanyName(savedCompanyName);
-    if (savedCompanyLogo) setCompanyLogo(savedCompanyLogo);
-    if (savedCompanyDescription) setCompanyDescription(savedCompanyDescription);
-  }, []);
-
-  // ذخیره وضعیت سایدبار در localStorage
-  useEffect(() => {
-    const savedState = localStorage.getItem("sidebarCollapsed");
-    if (savedState !== null) {
-      setIsSidebarCollapsed(savedState === "true");
-    }
-  }, []);
-
-  const toggleSidebar = () => {
-    const newState = !isSidebarCollapsed;
-    setIsSidebarCollapsed(newState);
-    localStorage.setItem("sidebarCollapsed", String(newState));
-  };
-
-  const getMenuItems = (): MenuItem[] => {
-    if (role === "مدیر کل") return adminMenuItems;
-    if (role === "مدیر") return managerMenuItems;
-    return staffMenuItems;
-  };
-
-  const menuItems = getMenuItems();
-
-  // اطلاعات کاربر بر اساس نقش
-  const getUserInfo = () => {
-    if (role === "مدیر کل") {
-      return {
-        name: "امیر حسینی",
-        role: "مدیر کل",
-        avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=امیر&length=2&font-size=0.24&size=40`,
-      };
-    }
-    if (role === "مدیر") {
-      return {
-        name: "سارا محمدی",
-        role: "مدیر",
-        avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=سارا&length=2&font-size=0.24&size=40`,
-      };
-    }
-    return {
-      name: "علی احمدی",
-      role: "کارمند",
-      avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=علی&length=2&font-size=0.24&size=40`,
-    };
-  };
-
-  const userInfo = getUserInfo();
-
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [pathname]);
-
-  const SidebarContent = () => (
+function SidebarContent({
+  isSidebarCollapsed,
+  menuItems,
+  pathname,
+  companyName,
+  companyLogo,
+  companyDescription,
+  toggleSidebar,
+  onMenuItemClick,
+}: SidebarContentProps) {
+  return (
     <>
       {/* لوگو و نام شرکت - در حالت کوچک فقط لوگو */}
       <div className="p-5 border-b border-[rgba(255,255,255,0.1)]">
         <div className="flex items-center justify-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center flex-shrink-0 overflow-hidden">
             {companyLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={companyLogo} alt="logo" className="w-full h-full object-cover" />
             ) : (
               <Headphones className="w-5 h-5 text-[#59D8C3]" />
@@ -163,14 +113,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <Link
                 key={item.id}
                 href={item.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-3xl text-sm font-medium transition-all relative group ${
+                onClick={onMenuItemClick}
+                className={`flex items-center justify-center gap-3 px-3 py-3 rounded-3xl text-sm font-medium transition-all relative group ${
                   isActive
                     ? "bg-[rgba(89,216,195,0.12)] text-[#59D8C3] border border-[rgba(89,216,195,0.2)] shadow-[0_0_20px_rgba(89,216,195,0.15)]"
                     : "text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.04)] border border-transparent hover:border-[rgba(255,255,255,0.1)]"
                 }`}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
+                <Icon className="w-5 h-6 flex-shrink-0" />
                 {!isSidebarCollapsed && (
                   <>
                     <span className="flex-1 text-right truncate">{item.title}</span>
@@ -189,9 +139,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* فوتر سایدبار با دکمه Collapse/Expand */}
       <div className="flex justify-between p-3 border-t border-[rgba(255,255,255,0.1)]">
-        
-        
-        {/* نسخه در حالت باز */}
         {!isSidebarCollapsed && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl">
             <Shield className="w-3 h-3 text-gray-600" />
@@ -199,24 +146,153 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         )}
 
-        
         <button
           onClick={toggleSidebar}
-          className=" flex items-center justify-center gap-2 p-1  rounded-full text-sm font-medium transition-all text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.04)] border border-transparent hover:border-[rgba(255,255,255,0.1)] group"
+          className="flex items-center justify-center gap-2 p-1 rounded-full text-sm font-medium transition-all text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.04)] border border-transparent hover:border-[rgba(255,255,255,0.1)] group"
         >
           {isSidebarCollapsed ? (
-            <>
-              <ChevronLeft className="w-4 h-4" />
-            </>
+            <ChevronLeft className="w-4 h-4" />
           ) : (
-            <>
-              <ChevronRight className="w-4 h-4" />
-            </>
+            <ChevronRight className="w-4 h-4" />
           )}
         </button>
       </div>
     </>
   );
+}
+
+// کامپوننت اصلی
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const pathname = usePathname();
+  const { role } = useRoleStore();
+  
+  // استفاده از lazy initialization برای مقدار اولیه
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedState = localStorage.getItem("sidebarCollapsed");
+      return savedState === "true";
+    }
+    return false;
+  });
+  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isMounted = useRef(true);
+  
+  // اطلاعات شرکت - با مقدار اولیه از localStorage
+  const [companyName, setCompanyName] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("companyName") || "آژانس سفر نمونه";
+    }
+    return "آژانس سفر نمونه";
+  });
+  
+  const [companyLogo, setCompanyLogo] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("companyLogo") || null;
+    }
+    return null;
+  });
+  
+  const [companyDescription, setCompanyDescription] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("companyDescription") || "پنل پشتیبانی مشتریان";
+    }
+    return "پنل پشتیبانی مشتریان";
+  });
+
+  // گوش دادن به تغییرات localStorage برای به‌روزرسانی خودکار
+  useEffect(() => {
+    isMounted.current = true;
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "companyName" && event.newValue !== null) {
+        setCompanyName(event.newValue);
+      }
+      if (event.key === "companyLogo" && event.newValue !== null) {
+        setCompanyLogo(event.newValue);
+      }
+      if (event.key === "companyDescription" && event.newValue !== null) {
+        setCompanyDescription(event.newValue);
+      }
+      if (event.key === "sidebarCollapsed" && event.newValue !== null) {
+        setIsSidebarCollapsed(event.newValue === "true");
+      }
+    };
+
+    // گوش دادن به رویداد سفارشی برای تغییرات در همان تب
+    const handleCompanyUpdate = () => {
+      const newName = localStorage.getItem("companyName");
+      const newLogo = localStorage.getItem("companyLogo");
+      const newDesc = localStorage.getItem("companyDescription");
+      
+      if (newName) setCompanyName(newName);
+      if (newLogo) setCompanyLogo(newLogo);
+      if (newDesc) setCompanyDescription(newDesc);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('companyUpdated', handleCompanyUpdate);
+
+    return () => {
+      isMounted.current = false;
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('companyUpdated', handleCompanyUpdate);
+    };
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    const newState = !isSidebarCollapsed;
+    setIsSidebarCollapsed(newState);
+    localStorage.setItem("sidebarCollapsed", String(newState));
+  }, [isSidebarCollapsed]);
+
+  const closeMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(false);
+  }, []);
+
+  // بستن منوی موبایل با تغییر مسیر
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isMounted.current) {
+        setIsMobileMenuOpen(false);
+      }
+    }, 0);
+    
+    return () => clearTimeout(timer);
+  }, [pathname]);
+
+  const getMenuItems = useCallback((): MenuItem[] => {
+    if (role === "مدیر کل") return adminMenuItems;
+    if (role === "مدیر") return managerMenuItems;
+    return staffMenuItems;
+  }, [role]);
+
+  const menuItems = useMemo(() => getMenuItems(), [getMenuItems]);
+
+  // اطلاعات کاربر بر اساس نقش
+  const getUserInfo = useCallback(() => {
+    if (role === "مدیر کل") {
+      return {
+        name: "امیر حسینی",
+        role: "مدیر کل",
+        avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=امیر&length=2&font-size=0.24&size=40`,
+      };
+    }
+    if (role === "مدیر") {
+      return {
+        name: "سارا محمدی",
+        role: "مدیر",
+        avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=سارا&length=2&font-size=0.24&size=40`,
+      };
+    }
+    return {
+      name: "علی احمدی",
+      role: "کارمند",
+      avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=علی&length=2&font-size=0.24&size=40`,
+    };
+  }, [role]);
+
+  const userInfo = useMemo(() => getUserInfo(), [getUserInfo]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#062723] to-[#020504]">
@@ -227,7 +303,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="fixed right-0 top-0 h-screen z-50 bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border-l border-[rgba(255,255,255,0.1)] hidden md:flex flex-col shadow-2xl"
       >
-        <SidebarContent />
+        <SidebarContent
+          isSidebarCollapsed={isSidebarCollapsed}
+          menuItems={menuItems}
+          pathname={pathname}
+          companyName={companyName}
+          companyLogo={companyLogo}
+          companyDescription={companyDescription}
+          toggleSidebar={toggleSidebar}
+          onMenuItemClick={closeMobileMenu}
+        />
       </motion.aside>
 
       {/* محتوای اصلی */}
@@ -250,7 +335,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsMobileMenuOpen(false)}
+              onClick={closeMobileMenu}
               className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] lg:hidden"
             />
 
@@ -266,6 +351,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center overflow-hidden">
                     {companyLogo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={companyLogo} alt="logo" className="w-full h-full object-cover" />
                     ) : (
                       <Headphones className="w-5 h-5 text-[#59D8C3]" />
@@ -277,7 +363,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   </div>
                 </div>
                 <button
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={closeMobileMenu}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -293,7 +379,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Link
                       key={item.id}
                       href={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
+                      onClick={closeMobileMenu}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                         isActive
                           ? "bg-[rgba(89,216,195,0.12)] text-[#59D8C3] border border-[rgba(89,216,195,0.2)]"
