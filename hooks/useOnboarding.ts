@@ -191,10 +191,20 @@ export function useOnboarding() {
     },
     onSuccess: (data) => {
       if (data) {
+        // ✅ ذخیره لوگو در store
         setCompanyInfo({
           logoUrl: data.url,
           logoId: data.id,
         });
+        
+        // ✅ ذخیره لوگو در localStorage برای DashboardLayout
+        localStorage.setItem('companyLogo', data.url);
+        
+        // ✅ Dispatch رویداد برای به‌روزرسانی DashboardLayout
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('companyUpdated'));
+        }
+        
         setUploadStatus('success');
         setTimeout(() => setUploadStatus('idle'), 3000);
         console.log('✅ لوگو با موفقیت آپلود شد:', data.url);

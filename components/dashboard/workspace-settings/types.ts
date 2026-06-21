@@ -13,6 +13,9 @@ export interface CompanyInfo {
   domain: string;
   description: string;
   logo: string | null;
+  phone?: string;      // ✅ اضافه شد
+  email?: string;      // ✅ اضافه شد
+  logoFile?: File | null; // ✅ اضافه شد
 }
 
 export interface SupportInfo {

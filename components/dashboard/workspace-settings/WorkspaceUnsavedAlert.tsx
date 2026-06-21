@@ -1,5 +1,3 @@
-// components/dashboard/workspace-settings/WorkspaceUnsavedAlert.tsx
-
 "use client";
 
 import { AlertCircle } from "lucide-react";
@@ -7,9 +5,14 @@ import { AlertCircle } from "lucide-react";
 interface WorkspaceUnsavedAlertProps {
   onSave: () => void;
   onCancel: () => void;
+  isSaving?: boolean; // ✅ اضافه شد
 }
 
-export default function WorkspaceUnsavedAlert({ onSave, onCancel }: WorkspaceUnsavedAlertProps) {
+export default function WorkspaceUnsavedAlert({ 
+  onSave, 
+  onCancel, 
+  isSaving = false 
+}: WorkspaceUnsavedAlertProps) {
   return (
     <div className="p-4 rounded-2xl bg-[rgba(242,184,75,0.08)] border border-[rgba(242,184,75,0.15)] flex items-center justify-between flex-wrap gap-3">
       <div className="flex items-center gap-3">
@@ -27,9 +30,21 @@ export default function WorkspaceUnsavedAlert({ onSave, onCancel }: WorkspaceUns
         </button>
         <button
           onClick={onSave}
-          className="px-4 py-2 rounded-xl text-sm font-medium bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] hover:shadow-lg transition-all"
+          disabled={isSaving}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+            isSaving
+              ? 'bg-gray-500/50 text-gray-400 cursor-not-allowed'
+              : 'bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] hover:shadow-lg'
+          }`}
         >
-          ذخیره تغییرات
+          {isSaving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-[#06110F] border-t-transparent rounded-full animate-spin" />
+              در حال ذخیره...
+            </>
+          ) : (
+            'ذخیره تغییرات'
+          )}
         </button>
       </div>
     </div>

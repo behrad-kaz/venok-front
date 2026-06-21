@@ -1,20 +1,11 @@
-// components/dashboard/workspace-settings/WorkspaceSettingsTabs.tsx
-
 "use client";
 
-import { 
-  Building2, 
-  Headphones, 
-  Clock, 
-  Bell, 
-  Shield, 
-  CheckCircle 
-} from "lucide-react";
+import { Building2, Headphones, Clock, Bell, Shield, CheckCircle } from "lucide-react";
 import { WorkspaceTabType } from "./types";
 
 interface WorkspaceSettingsTabsProps {
-  activeTab: WorkspaceTabType;
-  onTabChange: (tab: WorkspaceTabType) => void;
+  activeTab?: WorkspaceTabType;
+  onTabChange?: (tab: WorkspaceTabType) => void;
 }
 
 const tabs: { id: WorkspaceTabType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -26,9 +17,12 @@ const tabs: { id: WorkspaceTabType; label: string; icon: React.ComponentType<{ c
   { id: "setup", label: "وضعیت راه‌اندازی", icon: CheckCircle },
 ];
 
-export default function WorkspaceSettingsTabs({ activeTab, onTabChange }: WorkspaceSettingsTabsProps) {
+export default function WorkspaceSettingsTabs({ 
+  activeTab = "company", 
+  onTabChange = () => {} 
+}: WorkspaceSettingsTabsProps) {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-[rgba(255,255,255,0.05)] [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.3)] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.5)] pb-2">
+    <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-[rgba(255,255,255,0.05)] [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.3)] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.5)]  pb-2">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;

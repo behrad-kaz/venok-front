@@ -36,7 +36,7 @@ interface MenuItem {
 
 // منوی مدیر کل
 const adminMenuItems: MenuItem[] = [
-  { id: "dashboard", title: "داشبورد", icon: LayoutDashboard, href: "/dashboard" },
+  { id: "dashboard", title: "داشبورد", icon: LayoutDashboard, href: "/dashboard", badge: 5 },
   { id: "conversations", title: "گفتگوها", icon: MessageCircle, href: "/dashboard/conversations", badge: 5 },
   { id: "departments", title: "دپارتمان‌ها", icon: Building2, href: "/dashboard/departments" },
   { id: "members", title: "اعضا", icon: Users, href: "/dashboard/members" },
@@ -161,44 +161,150 @@ function SidebarContent({
   );
 }
 
+// تابع دریافت workspace اطلاعات از API
+const fetchWorkspaceName = async (): Promise<string | null> => {
+  try {
+    // دریافت workspaceId از localStorage
+    const workspaceId = localStorage.getItem("currentWorkspaceId");
+    if (!workspaceId) {
+      console.warn('⚠️ workspaceId یافت نشد');
+      return null;
+    }
+
+    // دریافت accessToken و contextToken
+    const accessToken = localStorage.getItem("accessToken");
+    const contextToken = localStorage.getItem("contextToken");
+
+    if (!accessToken) {
+      console.warn('⚠️ توکن موجود نیست');
+      return null;
+    }
+
+    const API_URL = 'http://localhost:3001';
+    
+    // دریافت workspace با ID
+    const response = await fetch(`${API_URL}/workspace/${workspaceId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        ...(contextToken && { 'x-context-token': contextToken }),
+      },
+    });
+
+    if (!response.ok) {
+      console.warn('⚠️ خطا در دریافت workspace:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('📡 workspace دریافت شد:', data);
+    
+    // برگرداندن name از دیتا
+    return data?.name || null;
+  } catch (error) {
+    console.error('❌ خطا در دریافت workspace:', error);
+    return null;
+  }
+};
+
+// تابع دریافت لوگو از API organization
+const fetchOrganizationLogo = async (): Promise<string | null> => {
+  try {
+    const accessToken = localStorage.getItem("accessToken");
+    const contextToken = localStorage.getItem("contextToken");
+
+    if (!accessToken) {
+      console.warn('⚠️ توکن موجود نیست');
+      return null;
+    }
+
+    const API_URL = 'http://localhost:3001';
+    
+    // دریافت organization جاری
+    const response = await fetch(`${API_URL}/organization/current`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        ...(contextToken && { 'x-context-token': contextToken }),
+      },
+    });
+
+    if (!response.ok) {
+      console.warn('⚠️ خطا در دریافت organization:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('📡 organization دریافت شد:', data);
+    
+    // برگرداندن لوگو از دیتا
+    return data?.logo || null;
+  } catch (error) {
+    console.error('❌ خطا در دریافت لوگو:', error);
+    return null;
+  }
+};
+
 // کامپوننت اصلی
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const { role } = useRoleStore();
   
-  // استفاده از lazy initialization برای مقدار اولیه
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedState = localStorage.getItem("sidebarCollapsed");
-      return savedState === "true";
-    }
-    return false;
-  });
-  
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMounted = useRef(true);
   
-  // اطلاعات شرکت - با مقدار اولیه از localStorage
-  const [companyName, setCompanyName] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem("companyName") || "آژانس سفر نمونه";
-    }
-    return "آژانس سفر نمونه";
-  });
-  
-  const [companyLogo, setCompanyLogo] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem("companyLogo") || null;
-    }
-    return null;
-  });
-  
-  const [companyDescription, setCompanyDescription] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem("companyDescription") || "پنل پشتیبانی مشتریان";
-    }
-    return "پنل پشتیبانی مشتریان";
-  });
+  // ✅ استفاده از useState با مقدار اولیه و سپس useEffect برای پر کردن
+  const [companyName, setCompanyName] = useState("آژانس سفر نمونه");
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [companyDescription, setCompanyDescription] = useState("پنل پشتیبانی مشتریان");
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  // ✅ بارگذاری اطلاعات از localStorage و API در کلاینت
+  useEffect(() => {
+    const loadData = async () => {
+      // 1. خواندن از localStorage
+      const savedCollapsed = localStorage.getItem("sidebarCollapsed");
+      if (savedCollapsed !== null) {
+        setIsSidebarCollapsed(savedCollapsed === "true");
+      }
+      
+      const savedName = localStorage.getItem("companyName");
+      const savedLogo = localStorage.getItem("companyLogo");
+      const savedDesc = localStorage.getItem("companyDescription");
+      
+      // 2. اگر نام شرکت در localStorage هست، ازش استفاده کن
+      if (savedName) {
+        setCompanyName(savedName);
+      } else {
+        // در غیر این صورت از API بگیر
+        const workspaceName = await fetchWorkspaceName();
+        if (workspaceName) {
+          setCompanyName(workspaceName);
+          localStorage.setItem("companyName", workspaceName);
+        }
+      }
+      
+      // 3. لوگو رو از localStorage یا API بگیر
+      if (savedLogo) {
+        setCompanyLogo(savedLogo);
+      } else {
+        const logo = await fetchOrganizationLogo();
+        if (logo) {
+          setCompanyLogo(logo);
+          localStorage.setItem("companyLogo", logo);
+        }
+      }
+      
+      if (savedDesc) {
+        setCompanyDescription(savedDesc);
+      }
+      
+      setIsDataLoaded(true);
+    };
+
+    loadData();
+  }, []);
 
   // گوش دادن به تغییرات localStorage برای به‌روزرسانی خودکار
   useEffect(() => {
