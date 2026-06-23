@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Header from "../layout/Header";
 import { useRoleStore } from "@/stores/useRoleStore";
+import { api } from "@/services/api-client";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -161,45 +162,18 @@ function SidebarContent({
   );
 }
 
-// تابع دریافت workspace اطلاعات از API
+// ✅ تابع دریافت workspace اطلاعات از API با استفاده از apiClient
 const fetchWorkspaceName = async (): Promise<string | null> => {
   try {
-    // دریافت workspaceId از localStorage
     const workspaceId = localStorage.getItem("currentWorkspaceId");
     if (!workspaceId) {
       console.warn('⚠️ workspaceId یافت نشد');
       return null;
     }
 
-    // دریافت accessToken و contextToken
-    const accessToken = localStorage.getItem("accessToken");
-    const contextToken = localStorage.getItem("contextToken");
-
-    if (!accessToken) {
-      console.warn('⚠️ توکن موجود نیست');
-      return null;
-    }
-
-    const API_URL = 'http://localhost:3001';
-    
-    // دریافت workspace با ID
-    const response = await fetch(`${API_URL}/workspace/${workspaceId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        ...(contextToken && { 'x-context-token': contextToken }),
-      },
-    });
-
-    if (!response.ok) {
-      console.warn('⚠️ خطا در دریافت workspace:', response.status);
-      return null;
-    }
-
-    const data = await response.json();
+    // ✅ استفاده از apiClient به جای fetch مستقیم
+    const data = await api.get<{ name: string }>(`/workspace/${workspaceId}`);
     console.log('📡 workspace دریافت شد:', data);
-    
-    // برگرداندن name از دیتا
     return data?.name || null;
   } catch (error) {
     console.error('❌ خطا در دریافت workspace:', error);
@@ -207,37 +181,12 @@ const fetchWorkspaceName = async (): Promise<string | null> => {
   }
 };
 
-// تابع دریافت لوگو از API organization
+// ✅ تابع دریافت لوگو با استفاده از apiClient
 const fetchOrganizationLogo = async (): Promise<string | null> => {
   try {
-    const accessToken = localStorage.getItem("accessToken");
-    const contextToken = localStorage.getItem("contextToken");
-
-    if (!accessToken) {
-      console.warn('⚠️ توکن موجود نیست');
-      return null;
-    }
-
-    const API_URL = 'http://localhost:3001';
-    
-    // دریافت organization جاری
-    const response = await fetch(`${API_URL}/organization/current`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        ...(contextToken && { 'x-context-token': contextToken }),
-      },
-    });
-
-    if (!response.ok) {
-      console.warn('⚠️ خطا در دریافت organization:', response.status);
-      return null;
-    }
-
-    const data = await response.json();
+    // ✅ استفاده از apiClient به جای fetch مستقیم
+    const data = await api.get<{ logo: string | null }>('/organization/current');
     console.log('📡 organization دریافت شد:', data);
-    
-    // برگرداندن لوگو از دیتا
     return data?.logo || null;
   } catch (error) {
     console.error('❌ خطا در دریافت لوگو:', error);
@@ -254,7 +203,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMounted = useRef(true);
   
-  // ✅ استفاده از useState با مقدار اولیه و سپس useEffect برای پر کردن
   const [companyName, setCompanyName] = useState("آژانس سفر نمونه");
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [companyDescription, setCompanyDescription] = useState("پنل پشتیبانی مشتریان");
@@ -263,44 +211,49 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // ✅ بارگذاری اطلاعات از localStorage و API در کلاینت
   useEffect(() => {
     const loadData = async () => {
-      // 1. خواندن از localStorage
-      const savedCollapsed = localStorage.getItem("sidebarCollapsed");
-      if (savedCollapsed !== null) {
-        setIsSidebarCollapsed(savedCollapsed === "true");
-      }
-      
-      const savedName = localStorage.getItem("companyName");
-      const savedLogo = localStorage.getItem("companyLogo");
-      const savedDesc = localStorage.getItem("companyDescription");
-      
-      // 2. اگر نام شرکت در localStorage هست، ازش استفاده کن
-      if (savedName) {
-        setCompanyName(savedName);
-      } else {
-        // در غیر این صورت از API بگیر
-        const workspaceName = await fetchWorkspaceName();
-        if (workspaceName) {
-          setCompanyName(workspaceName);
-          localStorage.setItem("companyName", workspaceName);
+      try {
+        // 1. خواندن از localStorage
+        const savedCollapsed = localStorage.getItem("sidebarCollapsed");
+        if (savedCollapsed !== null) {
+          setIsSidebarCollapsed(savedCollapsed === "true");
         }
-      }
-      
-      // 3. لوگو رو از localStorage یا API بگیر
-      if (savedLogo) {
-        setCompanyLogo(savedLogo);
-      } else {
+        
+        const savedName = localStorage.getItem("companyName");
+        const savedLogo = localStorage.getItem("companyLogo");
+        const savedDesc = localStorage.getItem("companyDescription");
+        
+        // 2. نام شرکت
+        if (savedName) {
+          setCompanyName(savedName);
+        } else {
+          const workspaceName = await fetchWorkspaceName();
+          if (workspaceName) {
+            setCompanyName(workspaceName);
+            localStorage.setItem("companyName", workspaceName);
+          }
+        }
+        
+        // 3. ✅ لوگو - همیشه از API بگیر (چون URL ممکنه منقضی شده باشه)
+        console.log('🔄 دریافت لوگو از API...');
         const logo = await fetchOrganizationLogo();
         if (logo) {
+          console.log('✅ لوگو از API دریافت شد');
           setCompanyLogo(logo);
           localStorage.setItem("companyLogo", logo);
+        } else if (savedLogo) {
+          // اگر API لوگو نداد، از localStorage استفاده کن
+          console.log('⚠️ لوگو از API دریافت نشد، استفاده از cached version');
+          setCompanyLogo(savedLogo);
         }
+        
+        if (savedDesc) {
+          setCompanyDescription(savedDesc);
+        }
+      } catch (error) {
+        console.error('❌ خطا در بارگذاری داده‌ها:', error);
+      } finally {
+        setIsDataLoaded(true);
       }
-      
-      if (savedDesc) {
-        setCompanyDescription(savedDesc);
-      }
-      
-      setIsDataLoaded(true);
     };
 
     loadData();
@@ -325,7 +278,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     };
 
-    // گوش دادن به رویداد سفارشی برای تغییرات در همان تب
     const handleCompanyUpdate = () => {
       const newName = localStorage.getItem("companyName");
       const newLogo = localStorage.getItem("companyLogo");
@@ -356,7 +308,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setIsMobileMenuOpen(false);
   }, []);
 
-  // بستن منوی موبایل با تغییر مسیر
   useEffect(() => {
     const timer = setTimeout(() => {
       if (isMounted.current) {
@@ -375,7 +326,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const menuItems = useMemo(() => getMenuItems(), [getMenuItems]);
 
-  // اطلاعات کاربر بر اساس نقش
   const getUserInfo = useCallback(() => {
     if (role === "مدیر کل") {
       return {
@@ -402,7 +352,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#062723] to-[#020504]">
-      {/* سایدبار دسکتاپ */}
       <motion.aside
         initial={false}
         animate={{ width: isSidebarCollapsed ? "80px" : "280px" }}
@@ -421,7 +370,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         />
       </motion.aside>
 
-      {/* محتوای اصلی */}
       <div 
         className={`transition-all duration-300 ${
           isSidebarCollapsed ? "md:mr-[80px]" : "md:mr-[280px]"
@@ -433,7 +381,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </main>
       </div>
 
-      {/* سایدبار موبایل */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
@@ -452,12 +399,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed right-0 top-0 w-72 h-full z-[101] bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border-l border-[rgba(255,255,255,0.1)] flex flex-col shadow-2xl lg:hidden"
             >
-              {/* هدر موبایل */}
               <div className="p-4 border-b border-[rgba(255,255,255,0.1)] flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center overflow-hidden">
                     {companyLogo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={companyLogo} alt="logo" className="w-full h-full object-cover" />
                     ) : (
                       <Headphones className="w-5 h-5 text-[#59D8C3]" />
@@ -476,7 +421,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </button>
               </div>
 
-              {/* منوی موبایل */}
               <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                 {menuItems.map((item) => {
                   const Icon = item.icon;
@@ -504,7 +448,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 })}
               </nav>
 
-              {/* پروفایل موبایل */}
               <div className="p-4 border-t border-[rgba(255,255,255,0.1)]">
                 <div className="flex items-center gap-3">
                   <img

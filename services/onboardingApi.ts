@@ -1,5 +1,6 @@
 // services/onboardingApi.ts
 import { WorkspaceData } from '@/stores/useOnboardingStore';
+import { api, apiClient } from './api-client';
 
 const API_URL = 'http://localhost:3001';
 
@@ -27,18 +28,6 @@ interface OrganizationResponse {
   workspaces?: WorkspaceData[];
 }
 
-// تنظیمات پایه برای درخواست‌ها
-const getHeaders = (accessToken: string, contextToken?: string | null) => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${accessToken}`,
-  };
-  if (contextToken) {
-    headers['x-context-token'] = contextToken;
-  }
-  return headers;
-};
-
 // 1. ساخت workspace جدید
 export const createWorkspace = async (
   data: {
@@ -53,7 +42,7 @@ export const createWorkspace = async (
 ): Promise<WorkspaceData> => {
   // دریافت managerStaffId از localStorage
   const currentOrganization = localStorage.getItem('currentOrganization');
-  let managerStaffId = 1; // مقدار پیش‌فرض
+  let managerStaffId = 1;
   
   if (currentOrganization) {
     try {
@@ -77,27 +66,10 @@ export const createWorkspace = async (
     locale: 'fa-IR',
   };
 
-  console.log('📤 ارسال به سرور:', {
-    url: `${API_URL}/workspace`,
-    body: requestBody,
-    headers: { ...getHeaders(accessToken, contextToken), 'Content-Type': 'application/json' }
-  });
+  console.log('📤 ارسال به سرور (POST /workspace):', requestBody);
 
-  const response = await fetch(`${API_URL}/workspace`, {
-    method: 'POST',
-    headers: getHeaders(accessToken, contextToken),
-    body: JSON.stringify(requestBody),
-  });
-
-  console.log(`📡 وضعیت ساخت workspace: ${response.status} ${response.statusText}`);
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('❌ خطای سرور:', error);
-    throw new Error(`خطا در ساخت workspace: ${response.status} - ${error}`);
-  }
-
-  return response.json();
+  // استفاده از apiClient
+  return api.post<WorkspaceData>('/workspace', requestBody);
 };
 
 // 2. به‌روزرسانی workspace
@@ -118,29 +90,13 @@ export const updateWorkspace = async (
     email: data.email,
   };
 
-  console.log('📤 ارسال به سرور (PATCH):', {
-    url: `${API_URL}/workspace`,
-    body: requestBody,
-  });
+  console.log('📤 ارسال به سرور (PATCH /workspace):', requestBody);
 
-  const response = await fetch(`${API_URL}/workspace`, {
-    method: 'PATCH',
-    headers: getHeaders(accessToken, contextToken),
-    body: JSON.stringify(requestBody),
-  });
-
-  console.log(`📡 وضعیت به‌روزرسانی workspace: ${response.status} ${response.statusText}`);
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('❌ خطای سرور:', error);
-    throw new Error(`خطا در به‌روزرسانی workspace: ${response.status} - ${error}`);
-  }
-
-  return response.json();
+  // استفاده از apiClient
+  return api.patch<WorkspaceData[]>('/workspace', requestBody);
 };
 
-// 3. آپلود لوگو
+// ✅ 3. آپلود لوگو - با استفاده از apiClient برای مدیریت خودکار توکن
 export const uploadLogo = async (
   file: File,
   accessToken: string,
@@ -161,16 +117,126 @@ export const uploadLogo = async (
     fileSize: file.size,
   });
 
+  // ✅ استفاده از fetch با مدیریت دستی توکن (چون FormData هست و apiClient نمیتونه handle کنه)
+  // اما برای مدیریت refresh token، از توکن‌های به‌روز شده استفاده میکنیم
+  const getValidToken = async (): Promise<string> => {
+    // بررسی اعتبار توکن فعلی
+    const currentToken = localStorage.getItem('accessToken');
+    if (currentToken) {
+      // برای سادگی، فرض میکنیم توکن معتبر است
+      // در صورت نیاز، میتونیم اینجا هم refresh رو انجام بدیم
+      return currentToken;
+    }
+    
+    // اگر توکن وجود نداشت، از refresh استفاده کن
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+      
+      const response = await fetch(`${API_URL}/auth/user/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Refresh failed');
+      }
+      
+      const data = await response.json();
+      localStorage.setItem('accessToken', data.accessToken);
+      if (data.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken);
+      }
+      return data.accessToken;
+    } catch (error) {
+      console.error('❌ خطا در refresh token:', error);
+      throw error;
+    }
+  };
+
+  // دریافت توکن معتبر
+  let validToken = localStorage.getItem('accessToken');
+  
+  // اگر توکن وجود نداشت یا منقضی شده بود، refresh کن
+  if (!validToken) {
+    try {
+      validToken = await getValidToken();
+    } catch (error) {
+      console.error('❌ خطا در دریافت توکن معتبر:', error);
+      // پاک کردن نشست و ریدایرکت به لاگین
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = '/login';
+      throw new Error('SESSION_EXPIRED');
+    }
+  }
+
+  const headers: HeadersInit = {
+    'Authorization': `Bearer ${validToken}`,
+  };
+  
+  // دریافت context token به‌روز
+  const contextTokenValue = localStorage.getItem('contextToken') || localStorage.getItem('x-context-token');
+  if (contextTokenValue) {
+    headers['x-context-token'] = contextTokenValue;
+  }
+
   const response = await fetch(`${API_URL}/uploads`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      ...(contextToken && { 'x-context-token': contextToken }),
-    },
+    headers,
     body: formData,
   });
 
   console.log(`📡 وضعیت آپلود لوگو: ${response.status} ${response.statusText}`);
+
+  // اگر 401 دریافت کردیم، سعی کن refresh کنی و دوباره تلاش کن
+  if (response.status === 401) {
+    console.log('⚠️ توکن منقضی شده، تلاش برای refresh...');
+    
+    try {
+      const newToken = await getValidToken();
+      
+      // به‌روزرسانی هدر با توکن جدید
+      const newHeaders: HeadersInit = {
+        'Authorization': `Bearer ${newToken}`,
+      };
+      const newContextToken = localStorage.getItem('contextToken') || localStorage.getItem('x-context-token');
+      if (newContextToken) {
+        newHeaders['x-context-token'] = newContextToken;
+      }
+      
+      // ارسال مجدد درخواست با توکن جدید
+      const retryResponse = await fetch(`${API_URL}/uploads`, {
+        method: 'POST',
+        headers: newHeaders,
+        body: formData,
+      });
+      
+      if (!retryResponse.ok) {
+        const error = await retryResponse.text();
+        console.error('❌ خطای سرور (تلاش مجدد):', error);
+        throw new Error(`خطا در آپلود لوگو: ${retryResponse.status} - ${error}`);
+      }
+      
+      return retryResponse.json();
+    } catch (refreshError) {
+      console.error('❌ خطا در refresh و تلاش مجدد:', refreshError);
+      // پاک کردن نشست و ریدایرکت به لاگین
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = '/login';
+      throw new Error('SESSION_EXPIRED');
+    }
+  }
 
   if (!response.ok) {
     const error = await response.text();
@@ -187,27 +253,8 @@ export const getLogoUrl = async (
   accessToken: string,
   contextToken?: string | null
 ): Promise<{ id: string; url: string }> => {
-  console.log('📤 دریافت URL لوگو:', {
-    url: `${API_URL}/uploads/${logoId}`,
-  });
-
-  const response = await fetch(`${API_URL}/uploads/${logoId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      ...(contextToken && { 'x-context-token': contextToken }),
-    },
-  });
-
-  console.log(`📡 وضعیت دریافت URL: ${response.status} ${response.statusText}`);
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('❌ خطای سرور:', error);
-    throw new Error(`خطا در دریافت URL لوگو: ${response.status} - ${error}`);
-  }
-
-  return response.json();
+  console.log('📤 دریافت URL لوگو:', `/uploads/${logoId}`);
+  return api.get<{ id: string; url: string }>(`/uploads/${logoId}`);
 };
 
 // 5. به‌روزرسانی organization
@@ -228,26 +275,8 @@ export const updateOrganization = async (
   accessToken: string,
   contextToken?: string | null
 ): Promise<OrganizationResponse[]> => {
-  console.log('📤 به‌روزرسانی organization:', {
-    url: `${API_URL}/organization`,
-    body: data,
-  });
-
-  const response = await fetch(`${API_URL}/organization`, {
-    method: 'PATCH',
-    headers: getHeaders(accessToken, contextToken),
-    body: JSON.stringify(data),
-  });
-
-  console.log(`📡 وضعیت به‌روزرسانی organization: ${response.status} ${response.statusText}`);
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('❌ خطای سرور:', error);
-    throw new Error(`خطا در به‌روزرسانی organization: ${response.status} - ${error}`);
-  }
-
-  return response.json();
+  console.log('📤 به‌روزرسانی organization:', data);
+  return api.patch<OrganizationResponse[]>('/organization', data);
 };
 
 // 6. تابع کمکی برای دریافت توکن‌ها

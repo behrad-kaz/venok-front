@@ -1,5 +1,6 @@
 // services/auth.service.ts
 import { LoginResponseModel, StoredUserData, UserRolePersianType, UserRoleType, OrganizationModel, WorkspaceModel } from '@/types/auth.types';
+import { api } from './api-client';
 
 // تعریف تایپ برای خطا
 interface ApiError {
@@ -26,6 +27,7 @@ interface SwitchContextResponse {
     accessToken: string;
     refreshToken: string;
   };
+  contextToken?: string;
   [key: string]: unknown;
 }
 
@@ -63,23 +65,10 @@ class AuthService {
     return { role: 'staff', rolePersian: 'کارمند' };
   }
 
-  // لاگین کاربر
+  // لاگین کاربر - استفاده از apiClient
   async login(username: string, password: string): Promise<LoginResponseModel> {
-    const response = await fetch(`${this.API_URL}/auth/user/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!response.ok && response.status !== 201) {
-      const error = await response.json() as ApiError;
-      throw new Error(error.message || 'خطا در ورود به سیستم');
-    }
-
-    const data = await response.json() as LoginResponseModel;
-    return data;
+    console.log('📤 ارسال به سرور (POST /auth/user/login):', { username });
+    return api.post<LoginResponseModel>('/auth/user/login', { username, password });
   }
 
   // دریافت workspace و organization پیش‌فرض
@@ -103,40 +92,14 @@ class AuthService {
     };
   }
 
-  // سوییچ context
+  // سوییچ context - استفاده از apiClient
   async switchContext(organizationId: number, workspaceId?: number): Promise<SwitchContextResponse> {
-    const accessToken = this.getAccessToken();
-    
-    if (!accessToken) {
-      throw new Error("توکن معتبر یافت نشد");
-    }
-    
-    const response = await fetch(`${this.API_URL}/account/context/switch`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessToken}`
-      },
-      body: JSON.stringify({
-        actorType: "staff",
-        organizationId: organizationId,
-        workspaceId: workspaceId || 0
-      }),
+    console.log('📤 ارسال به سرور (POST /account/context/switch):', { organizationId, workspaceId });
+    return api.post<SwitchContextResponse>('/account/context/switch', {
+      actorType: "staff",
+      organizationId: organizationId,
+      workspaceId: workspaceId || 0
     });
-    
-    if (!response.ok && response.status !== 200 && response.status !== 201) {
-      const error = await response.json().catch(() => ({})) as ApiError;
-      throw new Error(error.message || "خطا در تغییر context");
-    }
-    
-    const data = await response.json() as SwitchContextResponse;
-    
-    // به‌روزرسانی توکن در صورت وجود
-    if (data?.token) {
-      this.updateToken(data.token);
-    }
-    
-    return data;
   }
 
   // به‌روزرسانی توکن
@@ -235,8 +198,15 @@ class AuthService {
       console.log("✅ مرحله 3: context پیش‌فرض:", defaultContext);
       
       try {
-        await this.switchContext(defaultContext.organizationId, defaultContext.workspaceId || undefined);
+        const switchResult = await this.switchContext(defaultContext.organizationId, defaultContext.workspaceId || undefined);
         console.log("✅ مرحله 4: سوییچ context موفق");
+        
+        // ذخیره contextToken
+        if (switchResult?.contextToken) {
+          localStorage.setItem("contextToken", switchResult.contextToken);
+          localStorage.setItem("x-context-token", switchResult.contextToken);
+          document.cookie = `contextToken=${switchResult.contextToken}; path=/; max-age=${60 * 60 * 24 * 7}`;
+        }
       } catch (switchError) {
         console.warn("⚠️ سوییچ context با خطا مواجه شد:", switchError);
       }
