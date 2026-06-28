@@ -5,6 +5,7 @@
 import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import RoleGuard from "@/components/dashboard/RoleGuard";
+import { useModal } from "@/components/ui/modal";
 import WidgetTabs from "@/components/dashboard/widget/WidgetTabs";
 import WidgetStatusTab from "@/components/dashboard/widget/WidgetStatusTab";
 import WidgetAppearanceTab from "@/components/dashboard/widget/WidgetAppearanceTab";
@@ -35,6 +36,7 @@ const initialWidgetAppearance: WidgetAppearance = {
 };
 
 export default function WidgetPage() {
+  const { showSuccess, showInfo, showWarning, showError, showConfirm } = useModal();
   const [activeTab, setActiveTab] = useState<WidgetTabType>("status");
   
   // وضعیت ویجت
@@ -63,19 +65,23 @@ export default function WidgetPage() {
   // توابع ذخیره‌سازی
   const handleSaveStatus = () => {
     // در حالت واقعی، اینجا درخواست API زده می‌شود
-    alert("تنظیمات وضعیت ویجت ذخیره شد");
+    console.log("تنظیمات وضعیت ویجت ذخیره شد:", widgetStatus);
+    showSuccess("تنظیمات وضعیت ویجت با موفقیت ذخیره شد", "موفقیت ✨");
   };
 
   const handleSaveAppearance = () => {
-    alert("تنظیمات ظاهری ویجت ذخیره شد");
+    console.log("تنظیمات ظاهری ویجت ذخیره شد:", widgetAppearance);
+    showSuccess("تنظیمات ظاهری ویجت با موفقیت ذخیره شد", "موفقیت ✨");
   };
 
   const handleSaveForm = () => {
-    alert("تنظیمات فرم شروع گفتگو ذخیره شد");
+    console.log("تنظیمات فرم شروع گفتگو ذخیره شد");
+    showSuccess("تنظیمات فرم شروع گفتگو با موفقیت ذخیره شد", "موفقیت ✨");
   };
 
   const handleSaveReferrer = () => {
-    alert("تنظیمات مسیر ارجاع ذخیره شد");
+    console.log("تنظیمات مسیر ارجاع ذخیره شد");
+    showSuccess("تنظیمات مسیر ارجاع با موفقیت ذخیره شد", "موفقیت ✨");
   };
 
   const handleSaveAll = () => {
@@ -83,22 +89,51 @@ export default function WidgetPage() {
     if (hasAppearanceChanges) handleSaveAppearance();
     if (hasFormChanges) handleSaveForm();
     if (hasReferrerChanges) handleSaveReferrer();
+    
+    if (!hasAnyChanges) {
+      showInfo("هیچ تغییری برای ذخیره وجود ندارد", "اطلاعات");
+    }
   };
 
   const handleResetStatus = () => {
-    setWidgetStatus(initialWidgetStatus);
+    showConfirm(
+      "آیا از بازگشت به تنظیمات اولیه وضعیت ویجت مطمئن هستید؟",
+      "تایید بازگشت",
+      () => {
+        setWidgetStatus(initialWidgetStatus);
+        showSuccess("تنظیمات وضعیت ویجت به حالت اولیه بازگشت", "موفقیت ✨");
+      }
+    );
   };
 
   const handleResetAppearance = () => {
-    setWidgetAppearance(initialWidgetAppearance);
+    showConfirm(
+      "آیا از بازگشت به تنظیمات اولیه ظاهری ویجت مطمئن هستید؟",
+      "تایید بازگشت",
+      () => {
+        setWidgetAppearance(initialWidgetAppearance);
+        showSuccess("تنظیمات ظاهری ویجت به حالت اولیه بازگشت", "موفقیت ✨");
+      }
+    );
   };
 
   const handleToggleStatus = () => {
-    setWidgetStatus({ ...widgetStatus, isActive: !widgetStatus.isActive });
+    const newStatus = !widgetStatus.isActive;
+    const statusText = newStatus ? "فعال" : "غیرفعال";
+    
+    showConfirm(
+      `آیا از ${newStatus ? "فعال‌سازی" : "غیرفعال‌سازی"} ویجت مطمئن هستید؟`,
+      `تایید ${newStatus ? "فعال‌سازی" : "غیرفعال‌سازی"}`,
+      () => {
+        setWidgetStatus({ ...widgetStatus, isActive: newStatus });
+        showSuccess(`ویجت با موفقیت ${statusText} شد`, "موفقیت ✨");
+      }
+    );
   };
 
   const handleCheckConnection = () => {
-    alert("اتصال با موفقیت برقرار است");
+    // شبیه‌سازی بررسی اتصال
+    showSuccess("اتصال با موفقیت برقرار است", "اتصال پایدار ✅");
   };
 
   return (

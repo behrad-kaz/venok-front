@@ -1,8 +1,9 @@
 // components/dashboard/conversations/index.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { MessageCircle } from "lucide-react";
+import { useModal } from "@/components/ui/modal";
 import { Conversation } from "./types";
 import { getConversationsByDepartment, getStatusFiltersByDepartment, MANAGER_DEPARTMENT, assignableEmployees } from "./data";
 import ConversationList from "./ConversationList";
@@ -15,6 +16,7 @@ type LayoutMode = "desktop" | "tablet" | "mobile";
 
 export default function ConversationsContainer() {
   const { role } = useRoleStore();
+  const { showSuccess, showInfo, showWarning, showError, showConfirm } = useModal();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
@@ -23,21 +25,47 @@ export default function ConversationsContainer() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("desktop");
   
+  // ✅ استفاده از ref برای جلوگیری از اجرای مجدد useEffect
+  const isInitialized = useRef(false);
+  
   // دپارتمان مدیر (در حالت واقعی از پروفایل کاربر می‌آید)
   const userDepartment = role === "مدیر" ? MANAGER_DEPARTMENT : undefined;
   
-  // گفتگوهای فیلتر شده بر اساس نقش
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [filters, setFilters] = useState(getStatusFiltersByDepartment(role, userDepartment));
-
-  useEffect(() => {
-    // بارگذاری گفتگوهای مناسب با نقش
+  // ✅ استفاده از useMemo برای محاسبه مقادیر وابسته به role
+  const { filtered, filters: initialFilters } = useMemo(() => {
     const filtered = getConversationsByDepartment(role, userDepartment);
-    setConversations(filtered);
-    setFilters(getStatusFiltersByDepartment(role, userDepartment));
-    if (filtered.length > 0 && !selectedConversation) {
+    const filters = getStatusFiltersByDepartment(role, userDepartment);
+    return { filtered, filters };
+  }, [role, userDepartment]);
+
+  // گفتگوهای فیلتر شده بر اساس نقش
+  const [conversations, setConversations] = useState<Conversation[]>(filtered);
+  const [filters, setFilters] = useState(initialFilters);
+
+  // ✅ مقداردهی اولیه با useState و فقط یک بار اجرا
+  useEffect(() => {
+    if (!isInitialized.current && filtered.length > 0 && !selectedConversation) {
       setSelectedConversation(filtered[0]);
+      isInitialized.current = true;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ✅ به‌روزرسانی هنگام تغییر role با استفاده از useLayoutEffect یا useEffect با شرط
+  useEffect(() => {
+    // فقط زمانی که role تغییر کرده و مقداردهی اولیه انجام شده
+    if (isInitialized.current) {
+      const newFiltered = getConversationsByDepartment(role, userDepartment);
+      const newFilters = getStatusFiltersByDepartment(role, userDepartment);
+      
+      setConversations(newFiltered);
+      setFilters(newFilters);
+      
+      if (newFiltered.length > 0 && !selectedConversation) {
+        setSelectedConversation(newFiltered[0]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, userDepartment]);
 
   // تشخیص سایز صفحه
@@ -57,90 +85,93 @@ export default function ConversationsContainer() {
     return () => window.removeEventListener("resize", checkLayout);
   }, []);
 
-  const filteredConversations = conversations.filter((conv) => {
-    if (activeFilter !== "all" && conv.status !== activeFilter) return false;
-    if (searchQuery && !conv.customerName.includes(searchQuery) && !conv.subject.includes(searchQuery)) return false;
-    return true;
-  });
+  const filteredConversations = useMemo(() => {
+    return conversations.filter((conv) => {
+      if (activeFilter !== "all" && conv.status !== activeFilter) return false;
+      if (searchQuery && !conv.customerName.includes(searchQuery) && !conv.subject.includes(searchQuery)) return false;
+      return true;
+    });
+  }, [conversations, activeFilter, searchQuery]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = useCallback(() => {
     if (!newMessage.trim() || !selectedConversation) return;
     console.log("ارسال پیام:", newMessage);
+    showSuccess("پیام با موفقیت ارسال شد", "موفقیت ✨");
     setNewMessage("");
-  };
+  }, [newMessage, selectedConversation, showSuccess]);
 
-  const handleSelectConversation = (conversation: Conversation) => {
+  const handleSelectConversation = useCallback((conversation: Conversation) => {
     setSelectedConversation(conversation);
     setShowDetails(false);
-    if (layoutMode === "mobile") {
-      setViewMode("chat");
-    } else if (layoutMode === "tablet") {
+    if (layoutMode === "mobile" || layoutMode === "tablet") {
       setViewMode("chat");
     }
-  };
+  }, [layoutMode]);
 
-  const handleBackToList = () => {
-    if (layoutMode === "mobile") {
-      setViewMode("list");
-      setShowDetails(false);
-    } else if (layoutMode === "tablet") {
+  const handleBackToList = useCallback(() => {
+    if (layoutMode === "mobile" || layoutMode === "tablet") {
       setViewMode("list");
       setShowDetails(false);
     }
-  };
+  }, [layoutMode]);
 
-  const handleBackToChat = () => {
-    if (layoutMode === "mobile" && showDetails) {
-      setShowDetails(false);
-      setViewMode("chat");
-    } else if (layoutMode === "tablet" && showDetails) {
+  const handleBackToChat = useCallback(() => {
+    if ((layoutMode === "mobile" || layoutMode === "tablet") && showDetails) {
       setShowDetails(false);
       setViewMode("chat");
     }
-  };
+  }, [layoutMode, showDetails]);
 
-  const handleToggleDetails = () => {
-    if (layoutMode === "mobile") {
-      setShowDetails(true);
-      setViewMode("details");
-    } else if (layoutMode === "tablet") {
+  const handleToggleDetails = useCallback(() => {
+    if (layoutMode === "mobile" || layoutMode === "tablet") {
       setShowDetails(true);
       setViewMode("details");
     } else {
       setShowDetails(!showDetails);
     }
-  };
+  }, [layoutMode, showDetails]);
 
-  const handleCloseDetails = () => {
-    if (layoutMode === "mobile") {
-      setShowDetails(false);
-      setViewMode("chat");
-    } else if (layoutMode === "tablet") {
+  const handleCloseDetails = useCallback(() => {
+    if (layoutMode === "mobile" || layoutMode === "tablet") {
       setShowDetails(false);
       setViewMode("chat");
     } else {
       setShowDetails(false);
     }
-  };
+  }, [layoutMode]);
 
-  const handleChangeStatus = () => {
-    alert("تغییر وضعیت گفتگو");
-  };
+  const handleChangeStatus = useCallback(() => {
+    if (!selectedConversation) return;
+    
+    showInfo(
+      `وضعیت فعلی: ${selectedConversation.status}\n\nبرای تغییر وضعیت از منوی کشویی استفاده کنید.`,
+      "تغییر وضعیت گفتگو"
+    );
+  }, [selectedConversation, showInfo]);
 
-  const handleAssign = () => {
-    // برای مدیر دپارتمان، فقط کارمندهای دپارتمان خودش را نشان می‌دهد
-    if (role === "مدیر") {
-      alert(`ارجاع به کارمندهای دپارتمان ${MANAGER_DEPARTMENT}`);
-    } else {
-      alert("ارجاع به کارمند");
-    }
-  };
+  const handleAssign = useCallback(() => {
+    if (!selectedConversation) return;
+    
+    const departmentName = role === "مدیر" ? MANAGER_DEPARTMENT : "همه دپارتمان‌ها";
+    
+    showInfo(
+      `گفتگو با ${selectedConversation.customerName}\n\n` +
+      `برای ارجاع به کارمندهای ${departmentName}، از بخش تخصیص استفاده کنید.`,
+      "تخصیص/ارجاع گفتگو"
+    );
+  }, [selectedConversation, role, showInfo]);
 
-  const handleCloseConversation = () => {
-    if (selectedConversation) {
-      alert(`گفتگو با ${selectedConversation.customerName} بسته شد`);
-    }
-  };
+  const handleCloseConversation = useCallback(() => {
+    if (!selectedConversation) return;
+    
+    showConfirm(
+      `آیا از بستن گفتگو با "${selectedConversation.customerName}" مطمئن هستید؟`,
+      "تایید بستن گفتگو",
+      () => {
+        showSuccess(`گفتگو با ${selectedConversation.customerName} با موفقیت بسته شد`, "موفقیت ✨");
+      }
+    );
+  }, [selectedConversation, showConfirm, showSuccess]);
 
   // حالت دسکتاپ - نمایش سه ستون (بزرگتر از 1280px)
   if (layoutMode === "desktop") {

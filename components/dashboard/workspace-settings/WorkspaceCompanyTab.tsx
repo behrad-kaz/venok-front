@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { Image, Upload, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { useModal } from "@/components/ui/modal";
 import { CompanyInfo } from "./types";
 import { api } from "@/services/api-client";
 
@@ -11,6 +12,7 @@ interface WorkspaceCompanyTabProps {
 }
 
 export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCompanyTabProps) {
+  const { showWarning, showError, showSuccess, showInfo } = useModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -98,12 +100,12 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("حجم فایل باید کمتر از ۲ مگابایت باشد");
+      showWarning("حجم فایل باید کمتر از ۲ مگابایت باشد", "خطا در آپلود");
       return;
     }
 
     if (!file.type.match(/image\/(png|jpeg|jpg)/)) {
-      alert("فرمت فایل باید PNG یا JPG باشد");
+      showWarning("فرمت فایل باید PNG یا JPG باشد", "خطا در آپلود");
       return;
     }
 

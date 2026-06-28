@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import RoleGuard from "@/components/dashboard/RoleGuard";
 import { useRoleStore } from "@/stores/useRoleStore";
+import { useModal } from "@/components/ui/modal";
 
 // کامپوننت‌های تنظیمات دپارتمان
 import DepartmentSettingsTabs from "@/components/dashboard/settings/department/DepartmentSettingsTabs";
@@ -56,6 +57,7 @@ const initialRoutingRule = "queue";
 
 export default function DepartmentSettingsPage() {
   const { role } = useRoleStore();
+  const { showSuccess, showInfo, showWarning, showError, showConfirm } = useModal();
   const [activeTab, setActiveTab] = useState<TabType>("info");
 
   // اطلاعات دپارتمان
@@ -91,7 +93,7 @@ export default function DepartmentSettingsPage() {
 
   const handleSave = () => {
     console.log("تنظیمات ذخیره شد:", { departmentInfo, messages, workingHours, routingRule });
-    alert("تنظیمات با موفقیت ذخیره شد");
+    showSuccess("تنظیمات با موفقیت ذخیره شد", "موفقیت ✨");
   };
 
   const handleCancel = () => {
@@ -100,7 +102,7 @@ export default function DepartmentSettingsPage() {
     setMessages(initialMessages);
     setWorkingHours(initialWorkingHours);
     setRoutingRule(initialRoutingRule);
-    alert("تغییرات لغو شد");
+    showInfo("تغییرات با موفقیت لغو شد", "اطلاعات");
   };
 
   // اگر نقش مدیر دپارتمان نیست، دسترسی ندارد
@@ -122,7 +124,10 @@ export default function DepartmentSettingsPage() {
         <div className="space-y-6">
           {/* هشدار تغییرات ذخیره نشده */}
           {hasAnyChanges && (
-            <DepartmentUnsavedChangesAlert onSave={handleSave} onCancel={handleCancel} />
+            <DepartmentUnsavedChangesAlert 
+              onSave={handleSave} 
+              onCancel={handleCancel} 
+            />
           )}
 
           {/* تب‌ها */}

@@ -1,5 +1,6 @@
 // hooks/useWorkspaceSettings.ts
-import { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useModal } from '@/components/ui/modal';
 import {
   CompanyInfo,
   SupportInfo,
@@ -195,6 +196,7 @@ const deepCompare = (obj1: unknown, obj2: unknown): boolean => {
 };
 
 export function useWorkspaceSettings() {
+  const { showSuccess, showInfo, showWarning, showError, showConfirm } = useModal();
   const [isSaving, setIsSaving] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const isInitialLoadDone = useRef(false);
@@ -217,6 +219,7 @@ export function useWorkspaceSettings() {
         const workspaceId = localStorage.getItem("currentWorkspaceId");
         if (!workspaceId) {
           console.warn('⚠️ workspaceId یافت نشد');
+          showWarning("شناسه Workspace یافت نشد. لطفاً دوباره وارد شوید.", "خطا");
           return;
         }
 
@@ -288,6 +291,7 @@ export function useWorkspaceSettings() {
 
       } catch (error) {
         console.error('❌ خطا در بارگذاری اطلاعات:', error);
+        showError("خطا در بارگذاری اطلاعات. لطفاً دوباره تلاش کنید.", "خطا");
         setIsDataLoaded(true);
         isInitialLoadDone.current = true;
       }
@@ -297,7 +301,6 @@ export function useWorkspaceSettings() {
   }, []);
 
   // ✅ تشخیص تغییرات - فقط بعد از بارگذاری اولیه
-  // استفاده از isDataLoaded به جای ref در useMemo
   const hasChanges = useMemo(() => {
     if (!isDataLoaded) return false;
     
@@ -328,6 +331,7 @@ export function useWorkspaceSettings() {
     setSetupItems(items => items.map(item => 
       item.id === itemId ? { ...item, completed: true } : item
     ));
+    showSuccess("آیتم با موفقیت تکمیل شد", "موفقیت ✨");
   }, []);
 
   // خروج از همه نشست‌ها
@@ -335,35 +339,48 @@ export function useWorkspaceSettings() {
     const otherSessions = sessions.filter(session => !session.isCurrent);
     
     if (otherSessions.length === 0) {
-      alert("هیچ نشست فعال دیگری وجود ندارد");
+      showInfo("هیچ نشست فعال دیگری وجود ندارد", "اطلاعات");
       return;
     }
     
-    const currentSession = sessions.find(session => session.isCurrent === true);
-    if (currentSession) {
-      setSessions([currentSession]);
-      alert(`${otherSessions.length} نشست با موفقیت حذف شد`);
-    } else {
-      setSessions([]);
-      alert("همه نشست‌ها حذف شدند");
-    }
+    showConfirm(
+      `آیا از خروج از ${otherSessions.length} نشست فعال دیگر مطمئن هستید؟`,
+      "تایید خروج از همه نشست‌ها",
+      () => {
+        const currentSession = sessions.find(session => session.isCurrent === true);
+        if (currentSession) {
+          setSessions([currentSession]);
+          showSuccess(`${otherSessions.length} نشست با موفقیت حذف شد`, "موفقیت ✨");
+        } else {
+          setSessions([]);
+          showSuccess("همه نشست‌ها با موفقیت حذف شدند", "موفقیت ✨");
+        }
+      }
+    );
   }, [sessions]);
 
   // خروج از یک نشست خاص
   const handleLogoutSession = useCallback((sessionId: string) => {
     const sessionToRemove = sessions.find(s => s.id === sessionId);
     if (sessionToRemove?.isCurrent) {
-      alert("نمی‌توانید از نشست فعلی خارج شوید");
+      showWarning("نمی‌توانید از نشست فعلی خارج شوید", "خطا");
       return;
     }
     
-    setSessions(sessions.filter(s => s.id !== sessionId));
-    alert("خروج از نشست انجام شد");
+    showConfirm(
+      `آیا از خروج از نشست "${sessionToRemove?.device}" مطمئن هستید؟`,
+      "تایید خروج از نشست",
+      () => {
+        setSessions(sessions.filter(s => s.id !== sessionId));
+        showSuccess("خروج از نشست با موفقیت انجام شد", "موفقیت ✨");
+      }
+    );
   }, [sessions]);
 
   // بررسی اتصال پیامک
   const handleCheckSmsConnection = useCallback(() => {
-    alert("اتصال پیامک برقرار است");
+    // شبیه‌سازی بررسی اتصال
+    showSuccess("اتصال پیامک برقرار است", "اتصال پایدار ✅");
   }, []);
 
   // ✅ ذخیره تنظیمات
@@ -376,14 +393,14 @@ export function useWorkspaceSettings() {
     try {
       const { accessToken, contextToken } = getTokens();
       if (!accessToken) {
-        alert("توکن معتبر یافت نشد. لطفاً دوباره وارد شوید.");
+        showError("توکن معتبر یافت نشد. لطفاً دوباره وارد شوید.", "خطا");
         setIsSaving(false);
         return;
       }
 
       const workspaceId = localStorage.getItem("currentWorkspaceId");
       if (!workspaceId) {
-        alert("شناسه workspace یافت نشد");
+        showError("شناسه workspace یافت نشد", "خطا");
         setIsSaving(false);
         return;
       }
@@ -416,10 +433,15 @@ export function useWorkspaceSettings() {
       const logoFile = companyInfo.logoFile;
       if (logoFile) {
         console.log('🔄 آپلود لوگو...');
-        const uploadResult = await uploadLogo(logoFile, accessToken, contextToken);
-        const fileResult = await getLogoUrl(uploadResult.id, accessToken, contextToken);
-        newLogoUrl = fileResult.url;
-        console.log('✅ لوگو آپلود شد:', newLogoUrl);
+        try {
+          const uploadResult = await uploadLogo(logoFile, accessToken, contextToken);
+          const fileResult = await getLogoUrl(uploadResult.id, accessToken, contextToken);
+          newLogoUrl = fileResult.url;
+          console.log('✅ لوگو آپلود شد:', newLogoUrl);
+        } catch (uploadError) {
+          console.error('❌ خطا در آپلود لوگو:', uploadError);
+          showWarning("خطا در آپلود لوگو، اما سایر تنظیمات ذخیره شد.", "هشدار");
+        }
       }
 
       // 3. ✅ به‌روزرسانی organization با description و website
@@ -428,7 +450,6 @@ export function useWorkspaceSettings() {
         const organization = JSON.parse(currentOrganization);
         const slugOrg = generateSlug(companyInfo.name);
         
-        // ✅ ساخت payload کامل برای organization
         const updateOrgPayload = {
           name: organization.name || companyInfo.name,
           legalName: organization.legalName || companyInfo.name,
@@ -496,11 +517,11 @@ export function useWorkspaceSettings() {
       setSupportInfo(updatedSupportInfo);
       setBaseSupportInfo(updatedSupportInfo);
       
-      alert("تنظیمات با موفقیت ذخیره شد");
+      showSuccess("تنظیمات با موفقیت ذخیره شد", "موفقیت ✨");
       
     } catch (error) {
       console.error('❌ خطا در ذخیره‌سازی:', error);
-      alert("خطا در ذخیره تنظیمات. لطفاً دوباره تلاش کنید.");
+      showError("خطا در ذخیره تنظیمات. لطفاً دوباره تلاش کنید.", "خطا");
     } finally {
       setIsSaving(false);
     }
@@ -511,35 +532,45 @@ export function useWorkspaceSettings() {
     const savedCompany = getSavedCompanyInfo();
     const savedSupport = getSavedSupportInfo();
     
-    const resetCompanyInfo: CompanyInfo = {
-      name: savedCompany.name || baseCompanyInfo.name || "",
-      domain: savedCompany.domain || baseCompanyInfo.domain || "",
-      description: savedCompany.description || baseCompanyInfo.description || "",
-      logo: savedCompany.logo !== undefined ? savedCompany.logo : baseCompanyInfo.logo,
-      phone: baseCompanyInfo.phone || "",
-      email: baseCompanyInfo.email || "",
-      logoFile: null,
-    };
-    
-    const resetSupportInfo: SupportInfo = {
-      phone: savedSupport.phone || baseSupportInfo.phone || "",
-      email: savedSupport.email || baseSupportInfo.email || "",
-      alertPhone: savedSupport.alertPhone || "",
-      introText: savedSupport.introText || "",
-    };
-    
-    setCompanyInfo(resetCompanyInfo);
-    setBaseCompanyInfo(resetCompanyInfo);
-    
-    setSupportInfo(resetSupportInfo);
-    setBaseSupportInfo(resetSupportInfo);
-    
-    setWorkingHours(initialWorkingHours);
-    setNotificationSettings(initialNotificationSettings);
-    setSecuritySettings(initialSecuritySettings);
-    setSessions(initialSessions);
-    setSetupItems(initialSetupItems);
-    alert("تغییرات لغو شد");
+    showConfirm(
+      "آیا از لغو تغییرات مطمئن هستید؟ تغییرات ذخیره‌نشده از بین خواهند رفت.",
+      "تایید لغو تغییرات",
+      () => {
+        const resetCompanyInfo: CompanyInfo = {
+          name: savedCompany.name || baseCompanyInfo.name || "",
+          domain: savedCompany.domain || baseCompanyInfo.domain || "",
+          description: savedCompany.description || baseCompanyInfo.description || "",
+          logo: savedCompany.logo !== undefined ? savedCompany.logo : baseCompanyInfo.logo,
+          phone: baseCompanyInfo.phone || "",
+          email: baseCompanyInfo.email || "",
+          logoFile: null,
+        };
+        
+        const resetSupportInfo: SupportInfo = {
+          phone: savedSupport.phone || baseSupportInfo.phone || "",
+          email: savedSupport.email || baseSupportInfo.email || "",
+          alertPhone: savedSupport.alertPhone || "",
+          introText: savedSupport.introText || "",
+        };
+        
+        setCompanyInfo(resetCompanyInfo);
+        setBaseCompanyInfo(resetCompanyInfo);
+        
+        setSupportInfo(resetSupportInfo);
+        setBaseSupportInfo(resetSupportInfo);
+        
+        setWorkingHours(initialWorkingHours);
+        setNotificationSettings(initialNotificationSettings);
+        setSecuritySettings(initialSecuritySettings);
+        setSessions(initialSessions);
+        setSetupItems(initialSetupItems);
+        
+        showInfo("تغییرات با موفقیت لغو شد", "اطلاعات");
+      },
+      () => {
+        showInfo("لغو تغییرات کنسل شد", "اطلاعات");
+      }
+    );
   }, [baseCompanyInfo, baseSupportInfo]);
 
   // محاسبه آمار

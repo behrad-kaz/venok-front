@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, CheckCircle, Trash2, Edit2, Eye, EyeOff, Building2 } from "lucide-react";
 import { Department } from "../types";
+import { useModal } from '@/components/ui/modal';
 
 interface Step2DepartmentsProps {
   departments: Department[];
@@ -35,6 +36,7 @@ export default function Step2Departments({
   onCancelEdit,
   editingDepartment,
 }: Step2DepartmentsProps) {
+  const { showWarning, showSuccess } = useModal();
   const [newDepartment, setNewDepartment] = useState({
     name: "",
     description: "",
@@ -45,11 +47,12 @@ export default function Step2Departments({
 
   const handleAddDepartment = () => {
     if (!newDepartment.name.trim()) {
-      alert("لطفاً نام دپارتمان را وارد کنید");
+      showWarning('لطفاً نام دپارتمان را وارد کنید', 'خطا');
       return;
     }
     onAddDepartment(newDepartment);
     setNewDepartment({ name: "", description: "", isActive: true });
+    showSuccess('دپارتمان با موفقیت اضافه شد'); 
   };
 
   const handleSaveEdit = () => {

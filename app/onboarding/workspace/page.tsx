@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Building2, Users, CheckCircle } from 'lucide-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useModal } from '@/components/ui/modal';
 
 // کامپوننت‌ها
 import OnboardingLayout from '@/components/onboarding/OnboardingLayout';
@@ -42,6 +43,7 @@ const queryClient = new QueryClient({
 
 function WorkspaceSetupContent() {
   const router = useRouter();
+  const { showWarning, showError, showSuccess, showConfirm } = useModal();
   const [currentStep, setCurrentStep] = useState(1);
   const step1Ref = useRef<Step1CompanyInfoRef>(null);
   const { isSaving, handleSaveAll } = useOnboarding();
@@ -61,32 +63,51 @@ function WorkspaceSetupContent() {
   // توابع مدیریت دپارتمان
   const handleAddDepartment = (newDept: Omit<Department, 'id'>) => {
     if (departments.some((d) => d.name === newDept.name)) {
-      alert('این دپارتمان قبلاً اضافه شده است');
+      showWarning('این دپارتمان قبلاً اضافه شده است', 'تکرار');
       return;
     }
     setDepartments((prev) => [
       ...prev,
       { ...newDept, id: Date.now().toString() },
     ]);
+    showSuccess('دپارتمان با موفقیت اضافه شد', 'موفقیت ✨');
   };
 
   const handleAddQuickDepartment = (name: string) => {
-    if (departments.some((d) => d.name === name)) return;
+    if (departments.some((d) => d.name === name)) {
+      showWarning('این دپارتمان قبلاً اضافه شده است', 'تکرار');
+      return;
+    }
     setDepartments((prev) => [
       ...prev,
       { id: Date.now().toString(), name, description: '', isActive: true },
     ]);
+    showSuccess(`دپارتمان "${name}" با موفقیت اضافه شد`, 'موفقیت ✨');
   };
 
   const handleRemoveDepartment = (id: string) => {
-    setDepartments((prev) => prev.filter((d) => d.id !== id));
-    if (editingDepartment?.id === id) setEditingDepartment(null);
+    const departmentToRemove = departments.find((d) => d.id === id);
+    
+    showConfirm(
+      `آیا از حذف دپارتمان "${departmentToRemove?.name}" مطمئن هستید؟`,
+      'تایید حذف',
+      () => {
+        setDepartments((prev) => prev.filter((d) => d.id !== id));
+        if (editingDepartment?.id === id) setEditingDepartment(null);
+        showSuccess('دپارتمان با موفقیت حذف شد', 'موفقیت ✨');
+      }
+    );
   };
 
   const handleToggleDepartmentStatus = (id: string) => {
+    const department = departments.find((d) => d.id === id);
+    const newStatus = !department?.isActive;
+    const statusText = newStatus ? 'فعال' : 'غیرفعال';
+    
     setDepartments((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, isActive: !d.isActive } : d))
+      prev.map((d) => (d.id === id ? { ...d, isActive: newStatus } : d))
     );
+    showSuccess(`دپارتمان با موفقیت ${statusText} شد`, 'موفقیت ✨');
   };
 
   const handleEditDepartment = (dept: Department) => {
@@ -98,6 +119,7 @@ function WorkspaceSetupContent() {
       prev.map((d) => (d.id === editedDept.id ? editedDept : d))
     );
     setEditingDepartment(null);
+    showSuccess('تغییرات دپارتمان با موفقیت ذخیره شد', 'موفقیت ✨');
   };
 
   const handleCancelEditDepartment = () => {
@@ -110,10 +132,21 @@ function WorkspaceSetupContent() {
       ...prev,
       { ...newMember, id: Date.now().toString() },
     ]);
+    showSuccess('عضو جدید با موفقیت اضافه شد', 'موفقیت ✨');
   };
 
   const handleRemoveMember = (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+    const memberToRemove = members.find((m) => m.id === id);
+    const fullName = memberToRemove ? `${memberToRemove.firstName} ${memberToRemove.lastName}` : '';
+    
+    showConfirm(
+      `آیا از حذف "${fullName}" از تیم مطمئن هستید؟`,
+      'تایید حذف',
+      () => {
+        setMembers((prev) => prev.filter((m) => m.id !== id));
+        showSuccess('عضو با موفقیت حذف شد', 'موفقیت ✨');
+      }
+    );
   };
 
   // توابع عمومی
@@ -126,11 +159,11 @@ function WorkspaceSetupContent() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        alert('حجم فایل باید کمتر از ۲ مگابایت باشد');
+        showWarning('حجم فایل باید کمتر از ۲ مگابایت باشد', 'خطا در آپلود');
         return;
       }
       if (!file.type.match(/image\/(png|jpeg|jpg)/)) {
-        alert('فرمت فایل باید PNG یا JPG باشد');
+        showWarning('فرمت فایل باید PNG یا JPG باشد', 'خطا در آپلود');
         return;
       }
       setFormData((prev) => ({ ...prev, companyLogo: file }));
@@ -156,7 +189,10 @@ function WorkspaceSetupContent() {
       }
     } catch (error) {
       console.error('❌ خطا در ذخیره اطلاعات:', error);
-      alert('خطا در ذخیره اطلاعات. لطفاً دوباره تلاش کنید.');
+      showError(
+        'خطا در ذخیره اطلاعات. لطفاً دوباره تلاش کنید.',
+        'خطا در ذخیره'
+      );
     }
   };
 

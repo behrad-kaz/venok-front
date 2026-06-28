@@ -5,6 +5,7 @@ import { useRef, forwardRef, useImperativeHandle, useState, useEffect } from 're
 import { MessageCircle, Image, Phone, Mail, Loader2, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { api } from '@/services/api-client';
+import { useModal } from '@/components/ui/modal';
 
 export interface Step1CompanyInfoRef {
   handleSaveAll: () => Promise<void>;
@@ -14,6 +15,7 @@ export interface Step1CompanyInfoRef {
 type Step1CompanyInfoProps = object;
 
 const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>((_, ref) => {
+  const { showWarning, showError, showSuccess, showConfirm } = useModal();
   const {
     companyInfo,
     uploadStatus,
@@ -120,12 +122,12 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert('حجم فایل باید کمتر از ۲ مگابایت باشد');
+      showWarning('حجم فایل باید کمتر از ۲ مگابایت باشد', 'خطا در آپلود');
       return;
     }
 
     if (!file.type.match(/image\/(png|jpeg|jpg)/)) {
-      alert('فرمت فایل باید PNG یا JPG باشد');
+      showWarning('فرمت فایل باید PNG یا JPG باشد', 'خطا در آپلود');
       return;
     }
 

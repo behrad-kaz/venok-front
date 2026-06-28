@@ -1,8 +1,9 @@
 // components/dashboard/members/MemberSidebar.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Eye, EyeOff } from "lucide-react";
+import { useModal } from "@/components/ui/modal";
 import { Department, Member } from "./types";
 
 interface MemberSidebarProps {
@@ -33,6 +34,7 @@ export default function MemberSidebar({
   title,
   subtitle,
 }: MemberSidebarProps) {
+  const { showWarning, showError, showSuccess } = useModal();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
@@ -44,6 +46,8 @@ export default function MemberSidebar({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const isInitialized = useRef(false);
 
   useEffect(() => {
     if (editingMember) {
@@ -67,19 +71,77 @@ export default function MemberSidebar({
       setPassword("");
       setConfirmPassword("");
     }
+    isInitialized.current = true;
   }, [editingMember]);
+
+  // ✅ گوش دادن به رویداد modalOpened برای بستن سایدبار
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleModalOpened = () => {
+      console.log('🔴 مودال باز شد، بستن سایدبار...');
+      onClose();
+    };
+
+    // گوش دادن به رویداد سفارشی
+    window.addEventListener('modalOpened', handleModalOpened);
+
+    return () => {
+      window.removeEventListener('modalOpened', handleModalOpened);
+    };
+  }, [isOpen, onClose]);
+
+  // ✅ همچنین با MutationObserver هم بررسی می‌کنیم
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const observer = new MutationObserver(() => {
+      // بررسی وجود مودال در DOM
+      const modalOverlay = document.querySelector('.fixed.inset-0.z-\\[1000\\], .fixed.inset-0.z-\\[1001\\]');
+      if (modalOverlay) {
+        console.log('🔴 مودال در DOM تشخیص داده شد، بستن سایدبار...');
+        onClose();
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isOpen, onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName || !lastName || !username || !phone || !departmentId) return;
     
-    if (!editingMember && (!password || password.length < 8)) {
-      alert("رمز عبور باید حداقل ۸ کاراکتر باشد");
+    if (!firstName || !lastName || !username || !phone || !departmentId) {
+      showWarning("لطفاً تمام فیلدهای الزامی را پر کنید", "خطا در فرم");
       return;
     }
     
-    if (!editingMember && password !== confirmPassword) {
-      alert("رمز عبور و تکرار آن مطابقت ندارند");
+    if (!editingMember) {
+      if (!password || password.length < 8) {
+        showWarning("رمز عبور باید حداقل ۸ کاراکتر باشد", "خطا در رمز عبور");
+        return;
+      }
+      
+      if (password !== confirmPassword) {
+        showWarning("رمز عبور و تکرار آن مطابقت ندارند", "خطا در تکرار رمز");
+        return;
+      }
+    }
+    
+    const phoneRegex = /^09[0-9]{9}$/;
+    if (!phoneRegex.test(phone)) {
+      showWarning("شماره همراه باید با 09 شروع شود و ۱۱ رقم باشد", "خطا در شماره همراه");
+      return;
+    }
+    
+    if (username.length < 3) {
+      showWarning("نام کاربری باید حداقل ۳ کاراکتر باشد", "خطا در نام کاربری");
       return;
     }
     
@@ -93,6 +155,9 @@ export default function MemberSidebar({
       status,
       ...(password && { password }),
     });
+    
+    const actionText = editingMember ? "ویرایش" : "افزودن";
+    showSuccess(`عضو با موفقیت ${actionText} شد`, "موفقیت ✨");
     onClose();
   };
 
@@ -100,8 +165,12 @@ export default function MemberSidebar({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
-      <div className="fixed left-0 top-0 bottom-0 w-full max-w-md bg-[rgba(9,22,18,0.98)] border-l border-[rgba(255,255,255,0.1)] z-50 overflow-y-auto shadow-2xl">
+      <div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90]" 
+        onClick={onClose} 
+      />
+      
+      <div className="fixed left-0 top-0 bottom-0 w-full max-w-md bg-[rgba(9,22,18,0.98)] border-l border-[rgba(255,255,255,0.1)] z-[100] overflow-y-auto shadow-2xl">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -158,6 +227,7 @@ export default function MemberSidebar({
                 dir="ltr"
                 className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
               />
+              <p className="text-xs text-gray-500 mt-1">حداقل ۳ کاراکتر</p>
             </div>
 
             <div>
@@ -173,6 +243,7 @@ export default function MemberSidebar({
                 dir="ltr"
                 className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
               />
+              <p className="text-xs text-gray-500 mt-1">شماره همراه باید با 09 شروع شود</p>
             </div>
 
             {!editingMember && (
@@ -199,6 +270,7 @@ export default function MemberSidebar({
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">رمز عبور باید حداقل ۸ کاراکتر باشد</p>
                 </div>
 
                 <div>
