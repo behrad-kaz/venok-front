@@ -146,7 +146,7 @@ export default function Modal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
             onClick={handleOutsideClick}
-            className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm"
           />
 
           {/* Modal */}

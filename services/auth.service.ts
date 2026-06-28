@@ -67,8 +67,8 @@ class AuthService {
 
   // لاگین کاربر - استفاده از apiClient
   async login(username: string, password: string): Promise<LoginResponseModel> {
-    console.log('📤 ارسال به سرور (POST /auth/user/login):', { username });
-    return api.post<LoginResponseModel>('/auth/user/login', { username, password });
+    console.log('📤 ارسال به سرور (POST /auth/user/login/password):', { username });
+    return api.post<LoginResponseModel>('/auth/user/login/password', { username, password });
   }
 
   // دریافت workspace و organization پیش‌فرض
