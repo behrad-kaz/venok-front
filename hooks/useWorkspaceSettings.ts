@@ -1,5 +1,5 @@
 // hooks/useWorkspaceSettings.ts
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   CompanyInfo,
   SupportInfo,
@@ -16,6 +16,7 @@ import {
   updateOrganization,
   getTokens,
 } from '@/services/onboardingApi';
+import { api } from '@/services/api-client';
 
 const initialWorkingHours: WorkingHours = {
   workingDays: {
@@ -108,7 +109,7 @@ const generateSlug = (name: string): string => {
   return `${slug}-${Date.now()}`;
 };
 
-// ✅ مقداردهی اولیه با رشته‌های خالی (بدون دسترسی به localStorage)
+// ✅ مقداردهی اولیه
 const getInitialCompanyInfo = (): CompanyInfo => {
   return {
     name: "",
@@ -130,18 +131,20 @@ const getInitialSupportInfo = (): SupportInfo => {
   };
 };
 
-// ✅ تابع دریافت اطلاعات ذخیره شده از localStorage برای استفاده در handleCancel
+// ✅ تابع دریافت اطلاعات ذخیره شده از localStorage
 const getSavedCompanyInfo = (): Partial<CompanyInfo> => {
   if (typeof window === 'undefined') return {};
   
   const savedName = localStorage.getItem("companyName");
   const savedLogo = localStorage.getItem("companyLogo");
   const savedDesc = localStorage.getItem("companyDescription");
+  const savedDomain = localStorage.getItem("companyDomain");
   
   return {
     name: savedName || undefined,
     logo: savedLogo || null,
     description: savedDesc || undefined,
+    domain: savedDomain || undefined,
   };
 };
 
@@ -161,15 +164,44 @@ const getSavedSupportInfo = (): Partial<SupportInfo> => {
   };
 };
 
+// ✅ تابع مقایسه عمیق با تایپ‌های صحیح
+type CleanObject = Record<string, unknown>;
+
+const cleanObject = (obj: unknown): CleanObject => {
+  if (!obj || typeof obj !== 'object') return {};
+  
+  const cleaned: CleanObject = {};
+  const source = obj as Record<string, unknown>;
+  
+  for (const key in source) {
+    const value = source[key];
+    if (value !== undefined && value !== null && value !== '') {
+      if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+        cleaned[key] = cleanObject(value);
+      } else {
+        cleaned[key] = value;
+      }
+    }
+  }
+  
+  return cleaned;
+};
+
+const deepCompare = (obj1: unknown, obj2: unknown): boolean => {
+  const cleaned1 = cleanObject(obj1);
+  const cleaned2 = cleanObject(obj2);
+  
+  return JSON.stringify(cleaned1) === JSON.stringify(cleaned2);
+};
+
 export function useWorkspaceSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const isInitialLoadDone = useRef(false);
   
-  // ✅ مقداردهی اولیه با رشته‌های خالی
   const [baseCompanyInfo, setBaseCompanyInfo] = useState<CompanyInfo>(getInitialCompanyInfo);
   const [baseSupportInfo, setBaseSupportInfo] = useState<SupportInfo>(getInitialSupportInfo);
 
-  // Stateها با مقداردهی اولیه خالی
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(getInitialCompanyInfo);
   const [supportInfo, setSupportInfo] = useState<SupportInfo>(getInitialSupportInfo);
   const [workingHours, setWorkingHours] = useState<WorkingHours>(initialWorkingHours);
@@ -178,53 +210,104 @@ export function useWorkspaceSettings() {
   const [sessions, setSessions] = useState<Session[]>(initialSessions);
   const [setupItems, setSetupItems] = useState<SetupItem[]>(initialSetupItems);
 
-  // ✅ بارگذاری اطلاعات از localStorage فقط در کلاینت (بعد از Hydration)
+  // ✅ بارگذاری اطلاعات از API و localStorage
   useEffect(() => {
-    const savedName = localStorage.getItem("companyName");
-    const savedLogo = localStorage.getItem("companyLogo");
-    const savedDesc = localStorage.getItem("companyDescription");
-    
-    const newCompanyInfo: CompanyInfo = {
-      ...companyInfo,
-      name: savedName || "",
-      logo: savedLogo || null,
-      description: savedDesc || "",
+    const loadData = async () => {
+      try {
+        const workspaceId = localStorage.getItem("currentWorkspaceId");
+        if (!workspaceId) {
+          console.warn('⚠️ workspaceId یافت نشد');
+          return;
+        }
+
+        // 1. دریافت اطلاعات workspace از API
+        console.log('🔄 دریافت اطلاعات workspace از API...');
+        const workspaceData = await api.get<{ 
+          id: number; 
+          name: string; 
+          phone: string | null; 
+          email: string | null;
+        }>(`/workspace/${workspaceId}`);
+        
+        console.log('📡 اطلاعات workspace دریافت شد:', workspaceData);
+
+        // 2. دریافت اطلاعات organization از API
+        console.log('🔄 دریافت اطلاعات organization از API...');
+        const orgData = await api.get<{ 
+          logo: string | null;
+          description: string | null;
+          website: string | null;
+          name?: string;
+          legalName?: string;
+        }>('/organization/current');
+        console.log('📡 organization دریافت شد:', orgData);
+
+        // 3. ساخت CompanyInfo از داده‌های دریافتی
+        const newCompanyInfo: CompanyInfo = {
+          name: workspaceData?.name || orgData?.name || '',
+          domain: orgData?.website || '',
+          description: orgData?.description || '',
+          logo: orgData?.logo || null,
+          phone: workspaceData?.phone || '',
+          email: workspaceData?.email || '',
+          logoFile: null,
+        };
+
+        // 4. ساخت SupportInfo
+        const newSupportInfo: SupportInfo = {
+          phone: workspaceData?.phone || '',
+          email: workspaceData?.email || '',
+          alertPhone: localStorage.getItem("supportAlertPhone") || '',
+          introText: localStorage.getItem("supportIntroText") || '',
+        };
+
+        // 5. به‌روزرسانی stateها
+        setCompanyInfo(newCompanyInfo);
+        setBaseCompanyInfo(newCompanyInfo);
+        setSupportInfo(newSupportInfo);
+        setBaseSupportInfo(newSupportInfo);
+        
+        // 6. ذخیره در localStorage
+        localStorage.setItem("companyName", newCompanyInfo.name);
+        if (newCompanyInfo.description) {
+          localStorage.setItem("companyDescription", newCompanyInfo.description);
+        }
+        if (newCompanyInfo.domain) {
+          localStorage.setItem("companyDomain", newCompanyInfo.domain);
+        }
+        if (newCompanyInfo.logo) {
+          localStorage.setItem("companyLogo", newCompanyInfo.logo);
+        }
+        localStorage.setItem("supportPhone", newSupportInfo.phone);
+        localStorage.setItem("supportEmail", newSupportInfo.email);
+        
+        setIsDataLoaded(true);
+        isInitialLoadDone.current = true;
+        
+        console.log('✅ اطلاعات با موفقیت بارگذاری شد');
+
+      } catch (error) {
+        console.error('❌ خطا در بارگذاری اطلاعات:', error);
+        setIsDataLoaded(true);
+        isInitialLoadDone.current = true;
+      }
     };
-    
-    setCompanyInfo(newCompanyInfo);
-    setBaseCompanyInfo(newCompanyInfo);
-    
-    const savedPhone = localStorage.getItem("supportPhone");
-    const savedEmail = localStorage.getItem("supportEmail");
-    const savedAlertPhone = localStorage.getItem("supportAlertPhone");
-    const savedIntroText = localStorage.getItem("supportIntroText");
-    
-    const newSupportInfo: SupportInfo = {
-      ...supportInfo,
-      phone: savedPhone || "",
-      email: savedEmail || "",
-      alertPhone: savedAlertPhone || "",
-      introText: savedIntroText || "",
-    };
-    
-    setSupportInfo(newSupportInfo);
-    setBaseSupportInfo(newSupportInfo);
-    
-    setIsDataLoaded(true);
+
+    loadData();
   }, []);
 
-  // ✅ استفاده از useMemo برای محاسبه تغییرات
+  // ✅ تشخیص تغییرات - فقط بعد از بارگذاری اولیه
+  // استفاده از isDataLoaded به جای ref در useMemo
   const hasChanges = useMemo(() => {
-    // اگر داده‌ها هنوز بارگذاری نشدن، تغییرات رو false در نظر بگیر
     if (!isDataLoaded) return false;
     
-    const hasCompany = JSON.stringify(companyInfo) !== JSON.stringify(baseCompanyInfo);
-    const hasSupport = JSON.stringify(supportInfo) !== JSON.stringify(baseSupportInfo);
-    const hasHours = JSON.stringify(workingHours) !== JSON.stringify(initialWorkingHours);
-    const hasNotifications = JSON.stringify(notificationSettings) !== JSON.stringify(initialNotificationSettings);
-    const hasSecurity = JSON.stringify(securitySettings) !== JSON.stringify(initialSecuritySettings) || 
-                        JSON.stringify(sessions) !== JSON.stringify(initialSessions);
-    const hasSetup = JSON.stringify(setupItems) !== JSON.stringify(initialSetupItems);
+    const hasCompany = !deepCompare(companyInfo, baseCompanyInfo);
+    const hasSupport = !deepCompare(supportInfo, baseSupportInfo);
+    const hasHours = !deepCompare(workingHours, initialWorkingHours);
+    const hasNotifications = !deepCompare(notificationSettings, initialNotificationSettings);
+    const hasSecurity = !deepCompare(securitySettings, initialSecuritySettings) || 
+                        !deepCompare(sessions, initialSessions);
+    const hasSetup = !deepCompare(setupItems, initialSetupItems);
     
     return hasCompany || hasSupport || hasHours || hasNotifications || hasSecurity || hasSetup;
   }, [
@@ -283,7 +366,7 @@ export function useWorkspaceSettings() {
     alert("اتصال پیامک برقرار است");
   }, []);
 
-  // ذخیره تنظیمات
+  // ✅ ذخیره تنظیمات
   const handleSave = useCallback(async (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (e) e.preventDefault();
     if (isSaving) return;
@@ -307,7 +390,7 @@ export function useWorkspaceSettings() {
 
       const slug = generateSlug(companyInfo.name);
       
-      // 1. به‌روزرسانی workspace با نام، شماره تماس و ایمیل
+      // 1. به‌روزرسانی workspace
       console.log('📤 ارسال به سرور (PATCH /workspace):', {
         name: companyInfo.name,
         phone: supportInfo.phone || '',
@@ -325,54 +408,70 @@ export function useWorkspaceSettings() {
         accessToken,
         contextToken
       );
-      
-      console.log('✅ به‌روزرسانی workspace با شماره تماس و ایمیل پشتیبانی موفقیت‌آمیز بود');
+      console.log('✅ به‌روزرسانی workspace موفق');
 
       let newLogoUrl = companyInfo.logo;
 
-      // 2. آپلود لوگو
+      // 2. آپلود لوگو (در صورت وجود)
       const logoFile = companyInfo.logoFile;
       if (logoFile) {
+        console.log('🔄 آپلود لوگو...');
         const uploadResult = await uploadLogo(logoFile, accessToken, contextToken);
         const fileResult = await getLogoUrl(uploadResult.id, accessToken, contextToken);
         newLogoUrl = fileResult.url;
-        
-        const currentOrganization = localStorage.getItem('currentOrganization');
-        if (currentOrganization) {
-          const organization = JSON.parse(currentOrganization);
-          const slugOrg = generateSlug(companyInfo.name);
-          
-          await updateOrganization(
-            {
-              name: organization.name || companyInfo.name,
-              legalName: organization.legalName || companyInfo.name,
-              slug: organization.slug || slugOrg,
-              type: organization.type || 'cafe',
-              legalType: organization.legalType || 'individual',
-              logo: fileResult.url,
-              nationalId: organization.nationalId || '',
-              taxId: organization.taxId || '',
-              website: organization.website || '',
-              currency: organization.currency || 'IRR',
-              locale: organization.locale || 'fa-IR',
-            },
-            accessToken,
-            contextToken
-          );
-        }
-        
-        localStorage.setItem("companyLogo", fileResult.url);
-        window.dispatchEvent(new CustomEvent('companyUpdated'));
+        console.log('✅ لوگو آپلود شد:', newLogoUrl);
       }
 
-      // 3. ذخیره در localStorage
+      // 3. ✅ به‌روزرسانی organization با description و website
+      const currentOrganization = localStorage.getItem('currentOrganization');
+      if (currentOrganization) {
+        const organization = JSON.parse(currentOrganization);
+        const slugOrg = generateSlug(companyInfo.name);
+        
+        // ✅ ساخت payload کامل برای organization
+        const updateOrgPayload = {
+          name: organization.name || companyInfo.name,
+          legalName: organization.legalName || companyInfo.name,
+          slug: organization.slug || slugOrg,
+          type: organization.type || 'cafe',
+          legalType: organization.legalType || 'individual',
+          logo: newLogoUrl || organization.logo || '',
+          nationalId: organization.nationalId || '',
+          taxId: organization.taxId || '',
+          website: companyInfo.domain || organization.website || '',
+          description: companyInfo.description || organization.description || '',
+          currency: organization.currency || 'IRR',
+          locale: organization.locale || 'fa-IR',
+        };
+        
+        console.log('📤 ارسال به organization (PATCH /organization):', updateOrgPayload);
+        
+        const updateResult = await updateOrganization(
+          updateOrgPayload,
+          accessToken,
+          contextToken
+        );
+        console.log('✅ به‌روزرسانی organization موفق:', updateResult);
+        
+        if (updateResult && Array.isArray(updateResult) && updateResult.length > 0) {
+          const updatedOrg = updateResult[0];
+          localStorage.setItem('currentOrganization', JSON.stringify(updatedOrg));
+          console.log('✅ currentOrganization به‌روزرسانی شد');
+        }
+      }
+
+      // 4. ذخیره در localStorage
       localStorage.setItem("companyName", companyInfo.name);
-      localStorage.setItem("companyDescription", companyInfo.description);
+      if (companyInfo.description) {
+        localStorage.setItem("companyDescription", companyInfo.description);
+      }
+      if (companyInfo.domain) {
+        localStorage.setItem("companyDomain", companyInfo.domain);
+      }
       if (newLogoUrl) {
         localStorage.setItem("companyLogo", newLogoUrl);
       }
       
-      // ✅ ذخیره اطلاعات پشتیبانی در localStorage
       localStorage.setItem("supportPhone", supportInfo.phone);
       localStorage.setItem("supportEmail", supportInfo.email);
       localStorage.setItem("supportAlertPhone", supportInfo.alertPhone);
@@ -380,7 +479,7 @@ export function useWorkspaceSettings() {
       
       window.dispatchEvent(new CustomEvent('companyUpdated'));
       
-      // ✅ به‌روزرسانی companyInfo با مقادیر جدید
+      // ✅ به‌روزرسانی base states با مقادیر جدید
       const updatedCompanyInfo: CompanyInfo = {
         ...companyInfo,
         logo: newLogoUrl,
@@ -390,15 +489,12 @@ export function useWorkspaceSettings() {
       setCompanyInfo(updatedCompanyInfo);
       setBaseCompanyInfo(updatedCompanyInfo);
       
-      // ✅ به‌روزرسانی supportInfo با مقادیر جدید
       const updatedSupportInfo: SupportInfo = {
         ...supportInfo,
       };
       
       setSupportInfo(updatedSupportInfo);
       setBaseSupportInfo(updatedSupportInfo);
-      
-      console.log('✅ شماره تماس پشتیبانی و ایمیل پشتیبانی با موفقیت در localStorage ذخیره شدند');
       
       alert("تنظیمات با موفقیت ذخیره شد");
       
@@ -412,23 +508,22 @@ export function useWorkspaceSettings() {
 
   // لغو تغییرات
   const handleCancel = useCallback(() => {
-    // ✅ برگرداندن به مقادیر ذخیره شده در localStorage
     const savedCompany = getSavedCompanyInfo();
     const savedSupport = getSavedSupportInfo();
     
     const resetCompanyInfo: CompanyInfo = {
-      name: savedCompany.name || "",
-      domain: "",
-      description: savedCompany.description || "",
-      logo: savedCompany.logo !== undefined ? savedCompany.logo : null,
-      phone: "",
-      email: "",
+      name: savedCompany.name || baseCompanyInfo.name || "",
+      domain: savedCompany.domain || baseCompanyInfo.domain || "",
+      description: savedCompany.description || baseCompanyInfo.description || "",
+      logo: savedCompany.logo !== undefined ? savedCompany.logo : baseCompanyInfo.logo,
+      phone: baseCompanyInfo.phone || "",
+      email: baseCompanyInfo.email || "",
       logoFile: null,
     };
     
     const resetSupportInfo: SupportInfo = {
-      phone: savedSupport.phone || "",
-      email: savedSupport.email || "",
+      phone: savedSupport.phone || baseSupportInfo.phone || "",
+      email: savedSupport.email || baseSupportInfo.email || "",
       alertPhone: savedSupport.alertPhone || "",
       introText: savedSupport.introText || "",
     };
@@ -445,7 +540,7 @@ export function useWorkspaceSettings() {
     setSessions(initialSessions);
     setSetupItems(initialSetupItems);
     alert("تغییرات لغو شد");
-  }, []);
+  }, [baseCompanyInfo, baseSupportInfo]);
 
   // محاسبه آمار
   const completedCount = useMemo(() => {
@@ -455,7 +550,6 @@ export function useWorkspaceSettings() {
   const totalCount = setupItems.length;
 
   return {
-    // Stateها
     companyInfo,
     supportInfo,
     workingHours,
@@ -466,7 +560,6 @@ export function useWorkspaceSettings() {
     isSaving,
     hasChanges,
     
-    // Setters
     setCompanyInfo,
     setSupportInfo,
     setWorkingHours,
@@ -475,7 +568,6 @@ export function useWorkspaceSettings() {
     setSessions,
     setSetupItems,
     
-    // Handlers
     handleCompleteSetupItem,
     handleLogoutAll,
     handleLogoutSession,
@@ -483,7 +575,6 @@ export function useWorkspaceSettings() {
     handleSave,
     handleCancel,
     
-    // Data
     smsCredit: 5420,
     smsStatus: "connected" as const,
     lastSmsSent: "۲ ساعت پیش",

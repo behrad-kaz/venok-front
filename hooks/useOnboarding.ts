@@ -1,4 +1,5 @@
 // hooks/useOnboarding.ts
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOnboardingStore, WorkspaceData } from '@/stores/useOnboardingStore';
 import {
@@ -10,15 +11,27 @@ import {
   getTokens,
   saveWorkspaceToStorage,
 } from '@/services/onboardingApi';
+import { api } from '@/services/api-client';
 
 interface WorkspaceMutationResult {
   success: boolean;
   data?: WorkspaceData | WorkspaceData[];
 }
 
-interface LogoAndOrganizationResult {
-  url: string;
-  id: string;
+// ✅ تایپ صحیح برای payload organization
+interface OrganizationPayload {
+  name: string;
+  legalName: string;
+  slug: string;
+  type: string;
+  legalType: string;
+  nationalId: string;
+  taxId: string;
+  website: string;
+  description: string;
+  currency: string;
+  locale: string;
+  logo: string;
 }
 
 export function useOnboarding() {
@@ -38,9 +51,7 @@ export function useOnboarding() {
     setUploadError,
   } = useOnboardingStore();
 
-  // تابع تولید slug با timestamp برای جلوگیری از تکراری شدن
   const generateSlug = (name: string): string => {
-    // اگر name خالی بود، از "workspace" استفاده کن
     const baseName = name.trim() || 'workspace';
     let slug = baseName.toLowerCase();
     
@@ -57,34 +68,95 @@ export function useOnboarding() {
     slug = slug.replace(/[^a-z0-9-]/g, '');
     slug = slug.replace(/-+/g, '-').replace(/^-|-$/g, '');
     
-    // اگر slug خالی شد، از "workspace" استفاده کن
     if (!slug) slug = 'workspace';
     
-    // اضافه کردن timestamp برای یکتا شدن
     return `${slug}-${Date.now()}`;
   };
 
-  // ✅ Type Guard برای بررسی وجود لوگو
   const isLogoValid = (logo: File | null): logo is File => {
     return logo !== null && logo !== undefined;
   };
 
-  // Mutation برای ساخت/به‌روزرسانی workspace
+  // ✅ بارگذاری اولیه اطلاعات از API
+  const loadInitialData = async () => {
+    try {
+      const workspaceId = localStorage.getItem("currentWorkspaceId");
+      if (!workspaceId) {
+        console.warn('⚠️ workspaceId یافت نشد');
+        return;
+      }
+
+      console.log('🔄 دریافت اطلاعات workspace از API...');
+      const workspaceData = await api.get<{ 
+        id: number; 
+        name: string; 
+        phone: string | null; 
+        email: string | null;
+      }>(`/workspace/${workspaceId}`);
+      console.log('📡 اطلاعات workspace دریافت شد:', workspaceData);
+
+      console.log('🔄 دریافت اطلاعات organization از API...');
+      const orgData = await api.get<{ 
+        logo: string | null;
+        description: string | null;
+        website: string | null;
+        name?: string;
+        legalName?: string;
+      }>('/organization/current');
+      console.log('📡 organization دریافت شد:', orgData);
+
+      setCompanyInfo({
+        name: workspaceData?.name || orgData?.name || '',
+        phone: workspaceData?.phone || '',
+        email: workspaceData?.email || '',
+        logoUrl: orgData?.logo || null,
+        logo: orgData?.logo || null,
+        logoPreview: null,
+        logoId: null,
+        description: orgData?.description || '',
+        domain: orgData?.website || '',
+      });
+
+      if (orgData?.logo) {
+        localStorage.setItem("companyLogo", orgData.logo);
+      }
+
+      console.log('✅ اطلاعات با موفقیت بارگذاری شد');
+
+    } catch (error) {
+      console.error('❌ خطا در بارگذاری اطلاعات:', error);
+    }
+  };
+
+  const [isInitialLoaded, setIsInitialLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!isInitialLoaded) {
+      loadInitialData();
+      setIsInitialLoaded(true);
+    }
+  }, [isInitialLoaded]);
+
   const workspaceMutation = useMutation<WorkspaceMutationResult, Error>({
     mutationFn: async (): Promise<WorkspaceMutationResult> => {
       const { accessToken, contextToken } = getTokens();
       if (!accessToken) throw new Error('توکن معتبر یافت نشد');
 
-      // اگر name خالی بود، از "workspace" استفاده کن
       const workspaceName = companyInfo.name || 'workspace';
       const slug = generateSlug(workspaceName);
       const code = slug;
 
       let result;
       
-      // اگر workspaceId وجود دارد، به‌روزرسانی کن
       if (workspaceId) {
         console.log('🔄 به‌روزرسانی workspace با ID:', workspaceId);
+        console.log('📤 داده‌های ارسالی به workspace:', {
+          name: workspaceName,
+          phone: companyInfo.phone || '',
+          email: companyInfo.email || '',
+          slug,
+        });
+        
         result = await updateWorkspace(
           {
             name: workspaceName,
@@ -97,7 +169,6 @@ export function useOnboarding() {
         );
         console.log('✅ به‌روزرسانی workspace موفق:', result);
       } else {
-        // ساخت workspace جدید
         console.log('🚀 ساخت workspace جدید...');
         result = await createWorkspace(
           {
@@ -132,123 +203,140 @@ export function useOnboarding() {
     },
   });
 
-  // Mutation برای آپلود لوگو و به‌روزرسانی organization
-  const logoAndOrganizationMutation = useMutation<LogoAndOrganizationResult | null, Error>({
-    mutationFn: async (): Promise<LogoAndOrganizationResult | null> => {
-      const { accessToken, contextToken } = getTokens();
-      if (!accessToken) throw new Error('توکن معتبر یافت نشد');
-      
-      // ✅ استفاده از Type Guard برای بررسی وجود لوگو
-      if (!isLogoValid(companyInfo.logo)) {
-        console.log('ℹ️ لوگویی برای آپلود وجود ندارد (companyInfo.logo is null/undefined)');
-        return null;
-      }
-
-      // ✅ حالا TypeScript میدونه که companyInfo.logo از نوع File هست
-      const logoFile: File = companyInfo.logo;
-
-      setUploadStatus('uploading');
-
-      // 1. آپلود لوگو
-      console.log('🔄 آپلود لوگو...', logoFile.name, logoFile.size);
-      const uploadResult = await uploadLogo(logoFile, accessToken, contextToken);
-      console.log('✅ آپلود لوگو موفق:', uploadResult);
-      
-      // 2. دریافت URL
-      console.log('🔄 دریافت URL لوگو...');
-      const fileResult = await getLogoUrl(uploadResult.id, accessToken, contextToken);
-      console.log('✅ دریافت URL لوگو:', fileResult);
-      
-      // 3. به‌روزرسانی organization
-      const currentOrganization = localStorage.getItem('currentOrganization');
-      if (currentOrganization) {
-        const organization = JSON.parse(currentOrganization);
-        const workspaceName = companyInfo.name || 'workspace';
-        const slug = generateSlug(workspaceName);
-        
-        console.log('🔄 به‌روزرسانی organization با لوگو...');
-        await updateOrganization(
-          {
-            name: organization.name || workspaceName,
-            legalName: organization.legalName || workspaceName,
-            slug: organization.slug || slug,
-            type: organization.type || 'cafe',
-            legalType: organization.legalType || 'individual',
-            logo: fileResult.url,
-            nationalId: organization.nationalId || '',
-            taxId: organization.taxId || '',
-            website: organization.website || '',
-            currency: organization.currency || 'IRR',
-            locale: organization.locale || 'fa-IR',
-          },
-          accessToken,
-          contextToken
-        );
-        console.log('✅ به‌روزرسانی organization موفق');
-      }
-
-      return fileResult;
-    },
-    onSuccess: (data) => {
-      if (data) {
-        // ✅ ذخیره لوگو در store
-        setCompanyInfo({
-          logoUrl: data.url,
-          logoId: data.id,
-        });
-        
-        // ✅ ذخیره لوگو در localStorage برای DashboardLayout
-        localStorage.setItem('companyLogo', data.url);
-        
-        // ✅ Dispatch رویداد برای به‌روزرسانی DashboardLayout
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('companyUpdated'));
-        }
-        
-        setUploadStatus('success');
-        setTimeout(() => setUploadStatus('idle'), 3000);
-        console.log('✅ لوگو با موفقیت آپلود شد:', data.url);
-      }
-    },
-    onError: (error: Error) => {
-      console.error('❌ خطا در آپلود لوگو:', error);
-      setUploadStatus('error');
-      setUploadError(error.message || 'خطا در آپلود لوگو');
-      setTimeout(() => {
-        setUploadStatus('idle');
-        setUploadError(null);
-      }, 3000);
-    },
-  });
-
-  // تابع اصلی ذخیره‌سازی
   const handleSaveAll = async (): Promise<void> => {
     setIsSaving(true);
     try {
       console.log('🔄 شروع فرآیند ذخیره‌سازی...');
-      console.log('🔍 وضعیت لوگو در store:', {
-        hasLogo: isLogoValid(companyInfo.logo),
-        logoName: companyInfo.logo?.name,
-        logoSize: companyInfo.logo?.size,
-        logoUrl: companyInfo.logoUrl,
-        logoPreview: companyInfo.logoPreview ? 'exists' : 'null',
+      console.log('🔍 اطلاعات شرکت:', {
+        name: companyInfo.name,
+        phone: companyInfo.phone,
+        email: companyInfo.email,
+        description: companyInfo.description,
+        domain: companyInfo.domain,
+        hasLogo: isLogoValid(companyInfo.logo as File | null),
+        workspaceId: workspaceId,
       });
       
       // 1. ساخت/به‌روزرسانی workspace
       console.log('📌 مرحله 1: عملیات workspace');
       await workspaceMutation.mutateAsync();
       
-      // 2. آپلود لوگو و به‌روزرسانی organization
-      // ✅ استفاده از Type Guard
-      if (isLogoValid(companyInfo.logo)) {
-        console.log('📌 مرحله 2: آپلود لوگو و به‌روزرسانی organization');
-        await logoAndOrganizationMutation.mutateAsync();
-      } else {
-        console.log('ℹ️ لوگویی برای آپلود وجود ندارد');
+      // 2. به‌روزرسانی organization
+      console.log('📌 مرحله 2: به‌روزرسانی organization');
+      
+      const currentOrganization = localStorage.getItem('currentOrganization');
+      if (currentOrganization) {
+        const organization = JSON.parse(currentOrganization);
+        const workspaceName = companyInfo.name || 'workspace';
+        const slug = generateSlug(workspaceName);
+        
+        let logoUrl = organization.logo || '';
+        let logoUploadSuccess = false;
+        
+        // ✅ آپلود لوگو (اگر وجود داشته باشد)
+        const logoFile = companyInfo.logo as File | null;
+        if (isLogoValid(logoFile)) {
+          try {
+            console.log('🔄 آپلود لوگو...');
+            const { accessToken, contextToken } = getTokens();
+            
+            if (!accessToken) {
+              console.error('❌ accessToken موجود نیست!');
+              throw new Error('توکن معتبر یافت نشد');
+            }
+            
+            console.log('🔑 توکن موجود است:', accessToken.substring(0, 30) + '...');
+            console.log('🔑 contextToken:', contextToken ? contextToken.substring(0, 30) + '...' : '❌ وجود ندارد');
+            
+            const uploadResult = await uploadLogo(logoFile, accessToken, contextToken);
+            console.log('✅ آپلود لوگو موفق:', uploadResult);
+            
+            localStorage.setItem("companyLogoId", uploadResult.id);
+            
+            const fileResult = await getLogoUrl(uploadResult.id, accessToken, contextToken);
+            console.log('✅ دریافت URL لوگو:', fileResult);
+            
+            logoUrl = fileResult.url;
+            logoUploadSuccess = true;
+            
+            localStorage.setItem("companyLogo", logoUrl);
+            localStorage.setItem("companyLogoTimestamp", String(Date.now()));
+            
+            setCompanyInfo({
+              ...companyInfo,
+              logoUrl: logoUrl,
+              logo: logoUrl,
+            });
+            
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('companyUpdated'));
+              window.dispatchEvent(new CustomEvent('logoUpdated', { 
+                detail: { 
+                  logoId: uploadResult.id, 
+                  logoUrl: logoUrl 
+                }
+              }));
+            }
+          } catch (uploadError) {
+            console.error('❌ خطا در آپلود لوگو:', uploadError);
+            console.warn('⚠️ آپلود لوگو با خطا مواجه شد، ادامه با لوگوی قبلی...');
+            // اگر آپلود لوگو با خطا مواجه شد، لوگوی قبلی را نگه می‌داریم
+            logoUrl = organization.logo || '';
+          }
+        } else {
+          console.log('ℹ️ لوگویی برای آپلود وجود ندارد');
+        }
+        
+        // ✅ ساخت payload برای organization (حتی اگر لوگو آپلود نشده باشد)
+        const updatePayload: OrganizationPayload = {
+          name: organization.name || workspaceName,
+          legalName: organization.legalName || workspaceName,
+          slug: organization.slug || slug,
+          type: organization.type || 'cafe',
+          legalType: organization.legalType || 'individual',
+          nationalId: organization.nationalId || '',
+          taxId: organization.taxId || '',
+          website: companyInfo.domain || organization.website || '',
+          description: companyInfo.description || organization.description || '',
+          currency: organization.currency || 'IRR',
+          locale: organization.locale || 'fa-IR',
+          logo: logoUrl || organization.logo || '',
+        };
+        
+        console.log('🔄 به‌روزرسانی organization با داده‌های کامل...');
+        console.log('📤 ارسال به organization:', updatePayload);
+        
+        const { accessToken, contextToken } = getTokens();
+        if (accessToken) {
+          const updateResult = await updateOrganization(updatePayload, accessToken, contextToken);
+          console.log('✅ به‌روزرسانی organization موفق:', updateResult);
+          
+          if (updateResult && Array.isArray(updateResult) && updateResult.length > 0) {
+            const updatedOrg = updateResult[0];
+            localStorage.setItem('currentOrganization', JSON.stringify(updatedOrg));
+            console.log('✅ currentOrganization به‌روزرسانی شد');
+          }
+        } else {
+          console.error('❌ accessToken برای به‌روزرسانی organization موجود نیست!');
+        }
       }
       
       // 3. به‌روزرسانی کش
       queryClient.invalidateQueries({ queryKey: ['workspace'] });
+      
+      // 4. ذخیره اطلاعات در localStorage
+      localStorage.setItem("companyName", (companyInfo.name ?? '').toString());
+      
+      if (companyInfo.description) {
+        localStorage.setItem("companyDescription", (companyInfo.description ?? '').toString());
+      }
+      
+      if (companyInfo.domain) {
+        localStorage.setItem("companyDomain", (companyInfo.domain ?? '').toString());
+      }
+      
+      localStorage.setItem("companyPhone", (companyInfo.phone ?? '').toString());
+      localStorage.setItem("companyEmail", (companyInfo.email ?? '').toString());
       
       console.log('✅ همه عملیات با موفقیت انجام شد!');
       
@@ -261,7 +349,6 @@ export function useOnboarding() {
   };
 
   return {
-    // State
     companyInfo,
     workspaceData,
     workspaceId,
@@ -269,10 +356,9 @@ export function useOnboarding() {
     uploadStatus,
     uploadError,
     
-    // Actions
     setCompanyInfo,
     handleSaveAll,
     isWorkspaceLoading: workspaceMutation.isPending,
-    isLogoLoading: logoAndOrganizationMutation.isPending,
+    isLogoLoading: false,
   };
 }

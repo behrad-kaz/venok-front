@@ -1,6 +1,6 @@
 // services/onboardingApi.ts
 import { WorkspaceData } from '@/stores/useOnboardingStore';
-import { api, apiClient } from './api-client';
+import { api } from './api-client';
 
 const API_URL = 'http://localhost:3001';
 
@@ -40,7 +40,6 @@ export const createWorkspace = async (
   accessToken: string,
   contextToken?: string | null
 ): Promise<WorkspaceData> => {
-  // دریافت managerStaffId از localStorage
   const currentOrganization = localStorage.getItem('currentOrganization');
   let managerStaffId = 1;
   
@@ -68,7 +67,6 @@ export const createWorkspace = async (
 
   console.log('📤 ارسال به سرور (POST /workspace):', requestBody);
 
-  // استفاده از apiClient
   return api.post<WorkspaceData>('/workspace', requestBody);
 };
 
@@ -92,11 +90,10 @@ export const updateWorkspace = async (
 
   console.log('📤 ارسال به سرور (PATCH /workspace):', requestBody);
 
-  // استفاده از apiClient
   return api.patch<WorkspaceData[]>('/workspace', requestBody);
 };
 
-// ✅ 3. آپلود لوگو - با استفاده از apiClient برای مدیریت خودکار توکن
+// ✅ 3. آپلود لوگو - با مدیریت بهتر خطا و لاگ‌های دقیق
 export const uploadLogo = async (
   file: File,
   accessToken: string,
@@ -115,136 +112,139 @@ export const uploadLogo = async (
     url: `${API_URL}/uploads`,
     fileName: file.name,
     fileSize: file.size,
+    fileType: file.type,
+    hasAccessToken: !!accessToken,
+    hasContextToken: !!contextToken,
   });
 
-  // ✅ استفاده از fetch با مدیریت دستی توکن (چون FormData هست و apiClient نمیتونه handle کنه)
-  // اما برای مدیریت refresh token، از توکن‌های به‌روز شده استفاده میکنیم
+  // ✅ دریافت توکن معتبر
   const getValidToken = async (): Promise<string> => {
-    // بررسی اعتبار توکن فعلی
+    // ✅ استفاده از const به جای let
     const currentToken = localStorage.getItem('accessToken');
+    
     if (currentToken) {
-      // برای سادگی، فرض میکنیم توکن معتبر است
-      // در صورت نیاز، میتونیم اینجا هم refresh رو انجام بدیم
+      console.log('✅ توکن موجود است (از localStorage)');
       return currentToken;
     }
     
-    // اگر توکن وجود نداشت، از refresh استفاده کن
-    try {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-      
-      const response = await fetch(`${API_URL}/auth/user/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Refresh failed');
-      }
-      
-      const data = await response.json();
-      localStorage.setItem('accessToken', data.accessToken);
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
-      return data.accessToken;
-    } catch (error) {
-      console.error('❌ خطا در refresh token:', error);
-      throw error;
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      console.error('❌ Refresh token موجود نیست!');
+      throw new Error('No refresh token available');
     }
+    
+    console.log('🔄 تلاش برای refresh token...');
+    const response = await fetch(`${API_URL}/auth/user/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+    
+    if (!response.ok) {
+      console.error('❌ Refresh failed:', response.status, response.statusText);
+      throw new Error('Refresh failed');
+    }
+    
+    const data = await response.json();
+    console.log('✅ توکن جدید دریافت شد');
+    localStorage.setItem('accessToken', data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem('refreshToken', data.refreshToken);
+    }
+    return data.accessToken;
   };
 
   // دریافت توکن معتبر
-  let validToken = localStorage.getItem('accessToken');
+  let validToken = accessToken;
   
-  // اگر توکن وجود نداشت یا منقضی شده بود، refresh کن
   if (!validToken) {
     try {
       validToken = await getValidToken();
     } catch (error) {
       console.error('❌ خطا در دریافت توکن معتبر:', error);
-      // پاک کردن نشست و ریدایرکت به لاگین
-      localStorage.removeItem('isLoggedIn');
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      window.location.href = '/login';
       throw new Error('SESSION_EXPIRED');
     }
   }
+
+  console.log('🔑 توکن ارسالی:', validToken ? validToken.substring(0, 30) + '...' : '❌ وجود ندارد');
 
   const headers: HeadersInit = {
     'Authorization': `Bearer ${validToken}`,
   };
   
-  // دریافت context token به‌روز
-  const contextTokenValue = localStorage.getItem('contextToken') || localStorage.getItem('x-context-token');
+  const contextTokenValue = contextToken || localStorage.getItem('contextToken') || localStorage.getItem('x-context-token');
   if (contextTokenValue) {
     headers['x-context-token'] = contextTokenValue;
+    console.log('🔑 contextToken ارسالی:', contextTokenValue.substring(0, 30) + '...');
+  } else {
+    console.warn('⚠️ contextToken وجود ندارد!');
   }
 
-  const response = await fetch(`${API_URL}/uploads`, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+  try {
+    const response = await fetch(`${API_URL}/uploads`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
 
-  console.log(`📡 وضعیت آپلود لوگو: ${response.status} ${response.statusText}`);
+    console.log(`📡 وضعیت آپلود لوگو: ${response.status} ${response.statusText}`);
 
-  // اگر 401 دریافت کردیم، سعی کن refresh کنی و دوباره تلاش کن
-  if (response.status === 401) {
-    console.log('⚠️ توکن منقضی شده، تلاش برای refresh...');
-    
-    try {
-      const newToken = await getValidToken();
+    // اگر 401 دریافت کردیم، سعی کن refresh کنی
+    if (response.status === 401) {
+      console.log('⚠️ توکن منقضی شده، تلاش برای refresh...');
       
-      // به‌روزرسانی هدر با توکن جدید
-      const newHeaders: HeadersInit = {
-        'Authorization': `Bearer ${newToken}`,
-      };
-      const newContextToken = localStorage.getItem('contextToken') || localStorage.getItem('x-context-token');
-      if (newContextToken) {
-        newHeaders['x-context-token'] = newContextToken;
+      try {
+        const newToken = await getValidToken();
+        
+        const newHeaders: HeadersInit = {
+          'Authorization': `Bearer ${newToken}`,
+        };
+        const newContextToken = localStorage.getItem('contextToken') || localStorage.getItem('x-context-token');
+        if (newContextToken) {
+          newHeaders['x-context-token'] = newContextToken;
+        }
+        
+        const retryResponse = await fetch(`${API_URL}/uploads`, {
+          method: 'POST',
+          headers: newHeaders,
+          body: formData,
+        });
+        
+        if (!retryResponse.ok) {
+          const errorText = await retryResponse.text();
+          console.error('❌ خطای سرور (تلاش مجدد):', errorText);
+          throw new Error(`خطا در آپلود لوگو: ${retryResponse.status} - ${errorText}`);
+        }
+        
+        return retryResponse.json();
+      } catch (refreshError) {
+        console.error('❌ خطا در refresh و تلاش مجدد:', refreshError);
+        throw new Error('SESSION_EXPIRED');
       }
-      
-      // ارسال مجدد درخواست با توکن جدید
-      const retryResponse = await fetch(`${API_URL}/uploads`, {
-        method: 'POST',
-        headers: newHeaders,
-        body: formData,
-      });
-      
-      if (!retryResponse.ok) {
-        const error = await retryResponse.text();
-        console.error('❌ خطای سرور (تلاش مجدد):', error);
-        throw new Error(`خطا در آپلود لوگو: ${retryResponse.status} - ${error}`);
-      }
-      
-      return retryResponse.json();
-    } catch (refreshError) {
-      console.error('❌ خطا در refresh و تلاش مجدد:', refreshError);
-      // پاک کردن نشست و ریدایرکت به لاگین
-      localStorage.removeItem('isLoggedIn');
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      window.location.href = '/login';
-      throw new Error('SESSION_EXPIRED');
     }
-  }
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('❌ خطای سرور:', error);
-    throw new Error(`خطا در آپلود لوگو: ${response.status} - ${error}`);
-  }
+    if (!response.ok) {
+      let errorMessage = '';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || JSON.stringify(errorData);
+        console.error('❌ خطای سرور (JSON):', errorData);
+      } catch {
+        errorMessage = await response.text();
+        console.error('❌ خطای سرور (Text):', errorMessage);
+      }
+      throw new Error(`خطا در آپلود لوگو: ${response.status} - ${errorMessage}`);
+    }
 
-  return response.json();
+    const result = await response.json();
+    console.log('✅ آپلود لوگو موفق:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ خطا در آپلود لوگو:', error);
+    throw error;
+  }
 };
 
 // 4. دریافت URL لوگو
@@ -292,7 +292,6 @@ export const saveWorkspaceToStorage = (workspaceData: WorkspaceData) => {
   localStorage.setItem('currentWorkspaceId', String(workspaceData.id));
   localStorage.setItem('workspaceSlug', workspaceData.slug);
   
-  // تنظیم کوکی
   if (typeof document !== 'undefined') {
     const maxAge = 7 * 24 * 60 * 60;
     document.cookie = `workspaceId=${workspaceData.id}; path=/; max-age=${maxAge}`;

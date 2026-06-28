@@ -19,10 +19,12 @@ export interface CompanyInfo {
   name: string;
   phone: string;
   email: string;
-  logo: File | null;
+  logo: File | string | null;  // ✅ تغییر به File | string | null
   logoPreview: string | null;
-  logoUrl: string | null;
-  logoId: string | null;
+  logoUrl: string | null;      // ✅ اضافه شد
+  logoId: string | null;      // ✅ اضافه شد
+  description?: string;
+  domain?: string;
 }
 
 interface OnboardingState {

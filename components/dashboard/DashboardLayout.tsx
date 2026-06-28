@@ -399,9 +399,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed right-0 top-0 w-72 h-full z-[101] bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border-l border-[rgba(255,255,255,0.1)] flex flex-col shadow-2xl lg:hidden"
             >
-              <div className="p-4 border-b border-[rgba(255,255,255,0.1)] flex items-center justify-between">
+              <div className="p-3 border-b border-[rgba(255,255,255,0.1)] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center overflow-hidden">
+                  <div className="w-10 h-10 rounded-full bg-[rgba(89,216,195,0.15)] border border-[rgba(89,216,195,0.3)] flex items-center justify-center overflow-hidden">
                     {companyLogo ? (
                       <img src={companyLogo} alt="logo" className="w-full h-full object-cover" />
                     ) : (

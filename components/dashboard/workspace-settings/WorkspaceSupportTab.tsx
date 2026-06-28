@@ -1,8 +1,9 @@
-// components/dashboard/workspace-settings/WorkspaceSupportTab.tsx
-
 "use client";
 
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { SupportInfo } from "./types";
+import { api } from "@/services/api-client";
 
 interface WorkspaceSupportTabProps {
   info: SupportInfo;
@@ -10,6 +11,56 @@ interface WorkspaceSupportTabProps {
 }
 
 export default function WorkspaceSupportTab({ info, onInfoChange }: WorkspaceSupportTabProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
+  // ✅ بارگذاری اطلاعات workspace از API
+  useEffect(() => {
+    const loadWorkspaceData = async () => {
+      try {
+        setIsLoading(true);
+        const workspaceId = localStorage.getItem("currentWorkspaceId");
+        
+        if (!workspaceId) {
+          console.warn('⚠️ workspaceId یافت نشد');
+          return;
+        }
+
+        console.log('🔄 دریافت اطلاعات workspace از API برای SupportTab...');
+        const data = await api.get<{ 
+          id: number; 
+          phone: string | null; 
+          email: string | null;
+        }>(`/workspace/${workspaceId}`);
+        
+        console.log('📡 اطلاعات workspace دریافت شد:', data);
+        
+        if (data) {
+          // ✅ به‌روزرسانی supportInfo با مقادیر workspace
+          onInfoChange({
+            ...info,
+            phone: data.phone || '',
+            email: data.email || '',
+          });
+        }
+      } catch (error) {
+        console.error('❌ خطا در دریافت اطلاعات workspace:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadWorkspaceData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 text-[#59D8C3] animate-spin" />
+        <span className="mr-3 text-gray-400">در حال بارگذاری اطلاعات...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
       <h3 className="text-base font-bold text-white mb-2">اطلاعات پشتیبانی</h3>

@@ -4,6 +4,7 @@
 import { useRef, forwardRef, useImperativeHandle, useState, useEffect } from 'react';
 import { MessageCircle, Image, Phone, Mail, Loader2, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { useOnboarding } from '@/hooks/useOnboarding';
+import { api } from '@/services/api-client';
 
 export interface Step1CompanyInfoRef {
   handleSaveAll: () => Promise<void>;
@@ -30,6 +31,60 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
   
   // ✅ state برای تشخیص اینکه کاربر لوگوی جدید انتخاب کرده
   const [hasNewLogo, setHasNewLogo] = useState(false);
+  
+  // ✅ state برای بارگذاری اطلاعات workspace
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(false);
+  const [workspaceData, setWorkspaceData] = useState<{
+    name: string;
+    phone: string;
+    email: string;
+  } | null>(null);
+
+  // ✅ بارگذاری اطلاعات workspace از API
+  useEffect(() => {
+    const loadWorkspaceData = async () => {
+      try {
+        setIsLoadingWorkspace(true);
+        const workspaceId = localStorage.getItem("currentWorkspaceId");
+        
+        if (!workspaceId) {
+          console.warn('⚠️ workspaceId یافت نشد');
+          return;
+        }
+
+        console.log('🔄 دریافت اطلاعات workspace از API...');
+        const data = await api.get<{ 
+          id: number; 
+          name: string; 
+          phone: string | null; 
+          email: string | null;
+        }>(`/workspace/${workspaceId}`);
+        
+        console.log('📡 اطلاعات workspace دریافت شد:', data);
+        
+        if (data) {
+          setWorkspaceData({
+            name: data.name || '',
+            phone: data.phone || '',
+            email: data.email || '',
+          });
+          
+          // ✅ به‌روزرسانی companyInfo با مقادیر workspace
+          setCompanyInfo({
+            name: data.name || '',
+            phone: data.phone || '',
+            email: data.email || '',
+          });
+        }
+      } catch (error) {
+        console.error('❌ خطا در دریافت اطلاعات workspace:', error);
+      } finally {
+        setIsLoadingWorkspace(false);
+      }
+    };
+
+    loadWorkspaceData();
+  }, [setCompanyInfo]);
 
   // ✅ وقتی لوگو از سرور آپلود شد، state جدید رو reset کن
   useEffect(() => {
@@ -115,18 +170,28 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
 
   const logoUrl = getLogoUrl();
 
+  // ✅ اگر در حال بارگذاری هستیم، نمایش loader
+  if (isLoadingWorkspace) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 text-[#59D8C3] animate-spin" />
+        <span className="mr-3 text-gray-400">در حال بارگذاری اطلاعات...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-5">
         {/* نام شرکت */}
         <div>
           <label className="block text-xs font-medium text-gray-400 mb-1.5">
-            نام شرکت (اختیاری)
+            نام شرکت <span className="text-red-400">*</span>
           </label>
           <input
             type="text"
             name="name"
-            value={companyInfo.name}
+            value={companyInfo.name || ''}
             onChange={handleInputChange}
             className="w-full px-3.5 py-2.5 text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
             placeholder="مثال: آژانس سفر نمونه"
@@ -204,12 +269,12 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5">
-              شماره تماس پشتیبانی (اختیاری)
+              شماره تماس پشتیبانی
             </label>
             <input
               type="tel"
               name="phone"
-              value={companyInfo.phone}
+              value={companyInfo.phone || ''}
               onChange={handleInputChange}
               className="w-full px-3.5 py-2.5 text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
               placeholder="۰۲۱۱۲۳۴۵۶۷۸"
@@ -219,12 +284,12 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5">
-              ایمیل پشتیبانی (اختیاری)
+              ایمیل پشتیبانی
             </label>
             <input
               type="email"
               name="email"
-              value={companyInfo.email}
+              value={companyInfo.email || ''}
               onChange={handleInputChange}
               className="w-full px-3.5 py-2.5 text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
               placeholder="support@example.com"

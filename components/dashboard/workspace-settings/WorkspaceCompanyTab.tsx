@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Image, Upload, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { CompanyInfo } from "./types";
+import { api } from "@/services/api-client";
 
 interface WorkspaceCompanyTabProps {
   info: CompanyInfo;
@@ -16,27 +17,91 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [localLogoPreview, setLocalLogoPreview] = useState<string | null>(null);
   const [hasNewLogo, setHasNewLogo] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   
-  // ✅ همیشه false در سرور و کلاینت (تا بعد از Hydration)
+  // ✅ استفاده از useState با lazy initialization برای تشخیص کلاینت
   const [isClient, setIsClient] = useState(false);
 
-  // ✅ بعد از Hydration، true میشه
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ✅ فقط یک بار در useEffect، بدون setState مستقیم در بدنه
   useEffect(() => {
-    setIsClient(true);
+    const rafId = requestAnimationFrame(() => {
+      setIsClient(true);
+    });
+    
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  // ✅ بارگذاری اطلاعات از Organization API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // 1. دریافت اطلاعات workspace (برای name, phone, email)
+        const workspaceId = localStorage.getItem("currentWorkspaceId");
+        let workspaceData = null;
+        
+        if (workspaceId) {
+          console.log('🔄 دریافت اطلاعات workspace از API...');
+          workspaceData = await api.get<{ 
+            id: number; 
+            name: string; 
+            phone: string | null; 
+            email: string | null;
+          }>(`/workspace/${workspaceId}`);
+          console.log('📡 اطلاعات workspace دریافت شد:', workspaceData);
+        }
+        
+        // 2. دریافت اطلاعات organization (برای logo, description, website)
+        console.log('🔄 دریافت اطلاعات organization از API...');
+        const orgData = await api.get<{ 
+          logo: string | null;
+          description: string | null;
+          website: string | null;
+          name?: string;
+          legalName?: string;
+        }>('/organization/current');
+        console.log('📡 organization دریافت شد:', orgData);
+        
+        // 3. به‌روزرسانی info با مقادیر
+        const updatedInfo: CompanyInfo = {
+          ...info,
+          name: workspaceData?.name || orgData?.name || '',
+          phone: workspaceData?.phone || '',
+          email: workspaceData?.email || '',
+          description: orgData?.description || '',
+          domain: orgData?.website || '',
+          logo: orgData?.logo || null,
+        };
+        
+        onInfoChange(updatedInfo);
+        
+        // 4. تنظیم logoUrl برای نمایش
+        if (orgData?.logo) {
+          setLogoUrl(orgData.logo);
+          localStorage.setItem("companyLogo", orgData.logo);
+        }
+        
+      } catch (error) {
+        console.error('❌ خطا در دریافت اطلاعات:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // بررسی حجم فایل (حداکثر 2 مگابایت)
     if (file.size > 2 * 1024 * 1024) {
       alert("حجم فایل باید کمتر از ۲ مگابایت باشد");
       return;
     }
 
-    // بررسی نوع فایل
     if (!file.type.match(/image\/(png|jpeg|jpg)/)) {
       alert("فرمت فایل باید PNG یا JPG باشد");
       return;
@@ -46,11 +111,11 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
     setUploadStatus('uploading');
     setUploadError(null);
 
-    // ایجاد preview محلی
     const reader = new FileReader();
     reader.onloadend = () => {
       setLocalLogoPreview(reader.result as string);
       setHasNewLogo(true);
+      setLogoUrl(reader.result as string);
       
       onInfoChange({ 
         ...info, 
@@ -79,21 +144,30 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
     if (hasNewLogo && localLogoPreview) {
       return localLogoPreview;
     }
+    if (logoUrl) {
+      return logoUrl;
+    }
     if (info.logo) {
       return info.logo;
     }
     return null;
   };
 
-  const logoUrl = getLogoUrl();
+  const displayLogoUrl = getLogoUrl();
   const isUploading = uploadStatus === 'uploading' || uploading;
   const isUploadSuccess = uploadStatus === 'success';
   const isUploadError = uploadStatus === 'error';
 
-  // ✅ مقدار نمایش داده شده برای نام شرکت
-  // در سرور و اولین رندر کلاینت: رشته خالی
-  // بعد از Hydration: مقدار واقعی از info.name
   const displayName = isClient ? (info.name || "نام شرکت") : "نام شرکت";
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 text-[#59D8C3] animate-spin" />
+        <span className="mr-3 text-gray-400">در حال بارگذاری اطلاعات...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
@@ -115,7 +189,7 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
             />
           </div>
 
-          {/* دامنه سایت */}
+          {/* دامنه سایت - دریافت از organization.website */}
           <div>
             <label className="block text-sm font-medium text-white mb-2">دامنه سایت شرکت</label>
             <input
@@ -128,7 +202,7 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
             />
           </div>
 
-          {/* توضیحات */}
+          {/* توضیحات - دریافت از organization.description */}
           <div>
             <label className="block text-sm font-medium text-white mb-2">توضیح کوتاه شرکت</label>
             <textarea
@@ -151,9 +225,16 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
                     <span className="text-[10px] text-gray-500 mt-1">در حال آپلود...</span>
                   </div>
                 ) : (
-                  // ✅ فقط در کلاینت لوگو رو نمایش بده (بعد از Hydration)
-                  isClient && logoUrl ? (
-                    <img src={logoUrl} alt="logo" className="w-full h-full object-cover" />
+                  isClient && displayLogoUrl ? (
+                    <img 
+                      src={displayLogoUrl} 
+                      alt="logo" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.warn('⚠️ خطا در نمایش لوگو');
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
                   ) : (
                     <Image className="w-8 h-8 text-gray-500" />
                   )
@@ -210,15 +291,21 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
           <div className="p-4 rounded-xl bg-[rgba(0,0,0,0.2)] border border-[rgba(255,255,255,0.1)]">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] flex items-center justify-center overflow-hidden">
-                {/* ✅ فقط در کلاینت لوگو رو نمایش بده (بعد از Hydration) */}
-                {isClient && logoUrl ? (
-                  <img src={logoUrl} alt="logo" className="w-8 h-8 rounded-lg object-cover" />
+                {isClient && displayLogoUrl ? (
+                  <img 
+                    src={displayLogoUrl} 
+                    alt="logo" 
+                    className="w-8 h-8 rounded-lg object-cover"
+                    onError={(e) => {
+                      console.warn('⚠️ خطا در نمایش لوگو (پیش‌نمایش)');
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
                 ) : (
                   <Image className="w-5 h-5 text-gray-500" />
                 )}
               </div>
               <div>
-                {/* ✅ نمایش نام شرکت با مقدار ثابت در سرور و مقدار واقعی در کلاینت */}
                 <p className="text-sm font-bold text-white">{displayName}</p>
                 <p className="text-xs text-gray-500">{info.description || "توضیحات شرکت"}</p>
               </div>
