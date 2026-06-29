@@ -1,7 +1,7 @@
 // components/onboarding/steps/Step2Departments.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Plus, CheckCircle, Trash2, Edit2, Eye, EyeOff, Building2, Loader2 } from "lucide-react";
 import { Department } from "../types";
 import { 
@@ -10,7 +10,6 @@ import {
   deleteTeam, 
   getTeams, 
   TeamResponse,
-  generateSlug,
   UpdateTeamDto
 } from '@/services/teamApi';
 import { useModal } from '@/components/ui/modal';
@@ -56,75 +55,67 @@ export default function Step2Departments({
   });
 
   const [localEditingDept, setLocalEditingDept] = useState<Department | null>(null);
-  // ✅ استفاده از Map برای ذخیره mapping بین نام و teamId
   const [teamMap, setTeamMap] = useState<Map<string, number>>(new Map());
+  
+  // ✅ استفاده از useRef برای جلوگیری از بارگذاری مجدد
+  const hasLoadedRef = useRef(false);
+  const isLoadingRef = useRef(false);
 
-  // ✅ دریافت staffId از localStorage
-  const getStaffId = (): number => {
-    const userId = localStorage.getItem('userId');
-    return userId ? parseInt(userId) : 1;
-  };
-
-  // ✅ بارگذاری تیم‌های موجود از سرور
+  // ✅ بارگذاری تیم‌های موجود از سرور (فقط یک بار)
   useEffect(() => {
+    // ✅ اگر قبلاً بارگذاری شده یا در حال بارگذاری است، انجام نده
+    if (hasLoadedRef.current || isLoadingRef.current) return;
+    
     const loadTeams = async () => {
       try {
+        isLoadingRef.current = true;
         setIsLoading(true);
+        
         const teams = await getTeams();
-        console.log('📡 تیم‌های موجود از سرور:', teams);
+        console.log('📡 تیم‌های دریافت شده از سرور:', teams);
         
         if (teams && teams.length > 0) {
-          // فقط تیم‌های با scope venok_department را فیلتر کن
-          const venokTeams = teams.filter(t => t.scope === 'venok_department');
+          // ✅ فقط دپارتمان‌های فعال (deletedAt === null) را نمایش بده
+          const activeTeams = teams.filter(t => t.deletedAt === null);
+          console.log('📡 تیم‌های فعال (deletedAt === null):', activeTeams);
           
-          // اگر دپارتمان‌ها خالی هستند و تیم‌هایی از سرور وجود دارند
-          if (departments.length === 0 && venokTeams.length > 0) {
-            venokTeams.forEach((team, index) => {
-              // ✅ استفاده از index به عنوان بخشی از id برای جلوگیری از تکراری شدن
-              const uniqueId = `${team.id}-${Date.now()}-${index}`;
+          // ✅ اگر دپارتمان‌ها خالی هستند، اضافه کن
+          if (departments.length === 0 && activeTeams.length > 0) {
+            activeTeams.forEach((team) => {
               onAddDepartment({
                 name: team.name,
                 description: team.description || '',
-                isActive: true,
+                isActive: team.isActive,
               });
-              // ذخیره mapping بین نام و teamId
               setTeamMap(prev => new Map(prev).set(team.name, team.id));
             });
           }
         }
+        hasLoadedRef.current = true;
       } catch (error) {
         console.error('❌ خطا در بارگذاری تیم‌ها:', error);
       } finally {
         setIsLoading(false);
+        isLoadingRef.current = false;
       }
     };
 
     loadTeams();
-  }, []);
+  }, [departments.length, onAddDepartment]);
 
   // ✅ ارسال دپارتمان به سرور (CREATE)
   const submitDepartmentToServer = async (name: string, description: string): Promise<TeamResponse | null> => {
     try {
       setIsSubmitting(true);
       
-      const staffId = getStaffId();
-      
       const result = await createTeam({
         name: name,
         description: description,
-        scope: 'venok_department',
-        permissionIds: [1],
-        assignStaff: [
-          {
-            staffId: staffId,
-            permissionDenyIds: [],
-          }
-        ],
+        isActive: true,
       });
       
       console.log('✅ دپارتمان با موفقیت ایجاد شد:', result);
       
-      // ذخیره mapping بین نام دپارتمان و teamId
       setTeamMap(prev => new Map(prev).set(name, result.id));
       
       return result;
@@ -139,11 +130,10 @@ export default function Step2Departments({
   };
 
   // ✅ به‌روزرسانی دپارتمان در سرور (UPDATE)
-  const updateDepartmentOnServer = async (teamId: number, name: string, description: string): Promise<TeamResponse | null> => {
+  const updateDepartmentOnServer = async (teamId: number, name: string, description: string, isActive: boolean): Promise<TeamResponse | null> => {
     try {
       setIsSubmitting(true);
       
-      // پیدا کردن نام قبلی برای نگهداری mapping
       let oldName = '';
       for (const [key, value] of teamMap.entries()) {
         if (value === teamId) {
@@ -155,7 +145,7 @@ export default function Step2Departments({
       const updateData: UpdateTeamDto = {
         name: name,
         description: description,
-        slug: generateSlug(name),
+        isActive: isActive,
       };
       
       console.log(`📤 ارسال به‌روزرسانی برای teamId: ${teamId}`, updateData);
@@ -163,7 +153,6 @@ export default function Step2Departments({
       const result = await updateTeam(teamId, updateData);
       console.log('✅ دپارتمان با موفقیت به‌روزرسانی شد:', result);
       
-      // به‌روزرسانی mapping اگر نام تغییر کرده باشد
       if (oldName && oldName !== name) {
         setTeamMap(prev => {
           const newMap = new Map(prev);
@@ -185,11 +174,10 @@ export default function Step2Departments({
   };
 
   // ✅ حذف دپارتمان از سرور (DELETE)
-  const deleteDepartmentFromServer = async (name: string): Promise<boolean> => {
+  const deleteDepartmentFromServer = async (id: string, name: string): Promise<boolean> => {
     try {
       setIsSubmitting(true);
       
-      // پیدا کردن teamId از mapping
       const teamId = teamMap.get(name);
       if (!teamId) {
         console.warn(`⚠️ teamId برای دپارتمان "${name}" یافت نشد`);
@@ -197,16 +185,19 @@ export default function Step2Departments({
         return false;
       }
       
-      console.log(`📤 حذف تیم با ID: ${teamId} (DELETE /team/${teamId})`);
+      console.log(`📤 حذف تیم با ID: ${teamId} (DELETE /support/team/${teamId})`);
       const result = await deleteTeam(teamId);
       console.log(`✅ دپارتمان "${name}" با موفقیت حذف شد`);
       
-      // حذف mapping
+      // ✅ حذف mapping
       setTeamMap(prev => {
         const newMap = new Map(prev);
         newMap.delete(name);
         return newMap;
       });
+      
+      // ✅ حذف از لیست محلی
+      onRemoveDepartment(id);
       
       return result;
       
@@ -214,6 +205,48 @@ export default function Step2Departments({
       console.error('❌ خطا در حذف دپارتمان:', error);
       showError('خطا در حذف دپارتمان. لطفاً دوباره تلاش کنید.');
       return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ✅ تغییر وضعیت فعال/غیرفعال دپارتمان
+  const toggleDepartmentStatus = async (id: string, name: string, currentStatus: boolean) => {
+    try {
+      setIsSubmitting(true);
+      
+      let teamId: number | undefined = teamMap.get(name);
+      
+      if (!teamId) {
+        const dept = departments.find(d => d.id === id);
+        if (dept) {
+          teamId = teamMap.get(dept.name);
+        }
+      }
+
+      if (!teamId) {
+        showError('امکان تغییر وضعیت دپارتمان وجود ندارد.');
+        return;
+      }
+
+      const newStatus = !currentStatus;
+      
+      const updateData: UpdateTeamDto = {
+        isActive: newStatus,
+      };
+      
+      console.log(`📤 تغییر وضعیت تیم با ID: ${teamId} به ${newStatus ? 'فعال' : 'غیرفعال'}`);
+      
+      const result = await updateTeam(teamId, updateData);
+      
+      if (result) {
+        // ✅ فقط وضعیت را تغییر بده، دپارتمان از لیست حذف نشود
+        onToggleStatus(id);
+        showSuccess(`دپارتمان "${name}" با موفقیت ${newStatus ? 'فعال' : 'غیرفعال'} شد`);
+      }
+    } catch (error) {
+      console.error('❌ خطا در تغییر وضعیت دپارتمان:', error);
+      showError('خطا در تغییر وضعیت دپارتمان. لطفاً دوباره تلاش کنید.');
     } finally {
       setIsSubmitting(false);
     }
@@ -231,8 +264,6 @@ export default function Step2Departments({
     );
 
     if (result) {
-      // ✅ تولید id یکتا با استفاده از timestamp و نام
-      const uniqueId = `${result.id}-${Date.now()}`;
       onAddDepartment({
         name: newDepartment.name.trim(),
         description: newDepartment.description.trim(),
@@ -263,10 +294,8 @@ export default function Step2Departments({
       return;
     }
 
-    // ✅ پیدا کردن teamId از طریق نام دپارتمان در mapping
     let teamId: number | undefined = teamMap.get(localEditingDept.name);
     
-    // اگر پیدا نشد، از departments لیست پیدا کن
     if (!teamId) {
       const dept = departments.find(d => d.id === localEditingDept.id);
       if (dept) {
@@ -278,7 +307,8 @@ export default function Step2Departments({
       const result = await updateDepartmentOnServer(
         teamId,
         localEditingDept.name.trim(),
-        localEditingDept.description.trim()
+        localEditingDept.description.trim(),
+        localEditingDept.isActive
       );
 
       if (result) {
@@ -287,18 +317,15 @@ export default function Step2Departments({
         showSuccess('تغییرات با موفقیت ذخیره شد');
       }
     } else {
-      // اگر teamId پیدا نشد، به عنوان دپارتمان جدید ایجاد کن
       const result = await submitDepartmentToServer(
         localEditingDept.name.trim(),
         localEditingDept.description.trim()
       );
       
       if (result) {
-        // حذف دپارتمان قدیمی از لیست
         const oldDept = departments.find(d => d.id === localEditingDept.id);
         if (oldDept) {
           onRemoveDepartment(localEditingDept.id);
-          const uniqueId = `${result.id}-${Date.now()}`;
           onAddDepartment({
             name: localEditingDept.name.trim(),
             description: localEditingDept.description.trim(),
@@ -312,11 +339,7 @@ export default function Step2Departments({
   };
 
   const handleRemoveDepartment = async (id: string, name: string) => {
-    const result = await deleteDepartmentFromServer(name);
-    if (result) {
-      onRemoveDepartment(id);
-      showSuccess(`دپارتمان "${name}" با موفقیت حذف شد`);
-    }
+    await deleteDepartmentFromServer(id, name);
   };
 
   const handleCancelEdit = () => {
@@ -330,6 +353,16 @@ export default function Step2Departments({
   };
 
   const isEditing = localEditingDept !== null;
+
+  // ✅ اگر isLoading باشد، نمایش loader
+  if (isLoading && departments.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 text-[#59D8C3] animate-spin" />
+        <span className="mr-3 text-gray-400">در حال بارگذاری دپارتمان‌ها...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -494,10 +527,13 @@ export default function Step2Departments({
         </div>
       )}
 
-      {/* لیست دپارتمان‌ها */}
+      {/* ✅ لیست دپارتمان‌ها با کلید یکتا */}
       <div className="space-y-3">
         {departments.map((dept) => (
-          <div key={`${dept.id}-${dept.name}`} className="p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] hover:border-[rgba(89,216,195,0.3)] transition-colors">
+          <div 
+            key={`dept-${dept.id}-${dept.name}`} 
+            className="p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] hover:border-[rgba(89,216,195,0.3)] transition-colors"
+          >
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -510,9 +546,10 @@ export default function Step2Departments({
               </div>
               <div className="flex items-center gap-1">
                 <button 
-                  onClick={() => onToggleStatus(dept.id)} 
+                  onClick={() => toggleDepartmentStatus(dept.id, dept.name, dept.isActive)}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all" 
                   title={dept.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                  disabled={isSubmitting}
                 >
                   {dept.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
@@ -520,6 +557,7 @@ export default function Step2Departments({
                   onClick={() => handleEditClick(dept)} 
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all" 
                   title="ویرایش"
+                  disabled={isSubmitting}
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
@@ -527,6 +565,7 @@ export default function Step2Departments({
                   onClick={() => handleRemoveDepartment(dept.id, dept.name)} 
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-[rgba(255,107,107,0.05)] transition-all" 
                   title="حذف"
+                  disabled={isSubmitting}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

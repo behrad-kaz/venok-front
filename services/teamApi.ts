@@ -1,132 +1,195 @@
 // services/teamApi.ts
 import { api } from './api-client';
 
-// ✅ تایپ برای ایجاد تیم
+// ✅ تایپ برای ایجاد تیم (دپارتمان)
 export interface CreateTeamDto {
   name: string;
-  slug: string;
   description: string;
-  scope: 'venok_department';
-  permissionIds: number[];
-  assignStaff: {
-    staffId: number;
-    permissionDenyIds: number[];
-  }[];
+  color: string;
+  isActive: boolean;
 }
 
 // ✅ تایپ برای به‌روزرسانی تیم
 export interface UpdateTeamDto {
   name?: string;
-  slug?: string;
   description?: string;
-  scope?: 'venok_department';
-  assignStaff?: {
-    staffId: number;
-    permissionDenyIds: number[];
-  }[];
-  unassignStaffIds?: number[];
-  addPermissionIds?: number[];
-  delPermissionIds?: number[];
+  color?: string;
+  isActive?: boolean;
 }
 
 // ✅ تایپ برای پاسخ تیم
 export interface TeamResponse {
   id: number;
-  organizationId: number;
-  workspaceId: number;
   name: string;
-  slug: string;
   description: string;
-  isSystem: boolean;
-  scope: 'venok_department';
+  color: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
-  permission?: {
+  memberCount?: number;
+  managerName?: string | null;
+  openConversations?: number;
+  operationalStatus?: string;
+  lastActivity?: string;
+  supportAgentTeams?: {
     id: number;
+    agentId: number;
     teamId: number;
-    permissionId: number;
+    role: string;
     createdAt: string;
-  }[];
-  teamPermissions?: {
-    id: number;
-    teamId: number;
-    permissionId: number;
-    createdAt: string;
-  }[];
-  staffTeams?: {
-    id: number;
-    staffId: number;
-    teamId: number;
-    createdAt: string;
-    staff?: {
+    agent?: {
       id: number;
-      organizationId: number;
-      userId: number;
-      name: string;
-      code: string;
-      status: string;
+      venokStaffId: number;
+      isActive: boolean;
+      lastOnlineAt: string | null;
       createdAt: string;
       updatedAt: string;
       deletedAt: string | null;
+      venokStaff?: {
+        id: number;
+        coreStaffId: number;
+        name: string;
+        createdAt: string;
+        updatedAt: string;
+        deletedAt: string | null;
+      };
     };
   }[];
 }
 
-// ✅ تابع تبدیل نام به slug
-export const generateSlug = (name: string): string => {
-  let slug = name
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^a-z0-9\-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  
-  if (!slug) slug = 'department';
-  
-  return `${slug}-${Date.now()}`;
+// ✅ تابع تولید رنگ تصادفی
+const generateRandomColor = (): string => {
+  const colors = [
+    '#59D8C3', '#FF6B6B', '#F2B84B', '#8B7FDF', 
+    '#4DABF7', '#FF9F43', '#00D2D3', '#A29BFE',
+    '#FD79A8', '#00B894', '#E17055', '#74B9FF'
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
 };
 
-// ✅ 1. ایجاد تیم (دپارتمان) جدید - POST /team
-export const createTeam = async (
-  data: Omit<CreateTeamDto, 'slug'>
-): Promise<TeamResponse> => {
-  const slug = generateSlug(data.name);
+// ✅ URL سرویس Support
+const SUPPORT_API_URL = 'http://localhost:3004';
+
+// ✅ تابع کمکی برای دریافت هدرها
+const getHeaders = () => {
+  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const contextToken = typeof window !== 'undefined' ? localStorage.getItem('contextToken') : null;
   
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  
+  if (contextToken) {
+    headers['x-context-token'] = contextToken;
+  }
+  
+  return headers;
+};
+
+// ✅ 1. ایجاد تیم (دپارتمان) جدید - POST /support/team
+export const createTeam = async (
+  data: Omit<CreateTeamDto, 'color'>
+): Promise<TeamResponse> => {
   const requestBody: CreateTeamDto = {
     ...data,
-    slug,
+    color: generateRandomColor(),
   };
 
-  console.log('📤 ارسال به سرور (POST /team):', requestBody);
+  console.log('📤 ارسال به سرور (POST /support/team):', requestBody);
 
-  return api.post<TeamResponse>('/team', requestBody);
+  const response = await fetch(`${SUPPORT_API_URL}/support/team`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('❌ خطا در ایجاد تیم:', errorText);
+    throw new Error(`خطا در ایجاد تیم: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
 };
 
-// ✅ 2. دریافت همه تیم‌ها - GET /team
-export const getTeams = async (): Promise<TeamResponse[]> => {
-  console.log('📤 دریافت همه تیم‌ها (GET /team)');
-  return api.get<TeamResponse[]>('/team');
+// ✅ 2. دریافت همه تیم‌ها - GET /support/team
+export const getTeams = async (status?: 'active' | 'inactive'): Promise<TeamResponse[]> => {
+  const query = status ? `?status=${status}` : '';
+  console.log(`📤 دریافت همه تیم‌ها (GET /support/team${query})`);
+
+  const response = await fetch(`${SUPPORT_API_URL}/support/team${query}`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('❌ خطا در دریافت تیم‌ها:', errorText);
+    throw new Error(`خطا در دریافت تیم‌ها: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
 };
 
-// ✅ 3. دریافت تیم با ID - GET /team/{teamId}
+// ✅ 3. دریافت تیم با ID - GET /support/team/{teamId}
 export const getTeamById = async (id: number): Promise<TeamResponse> => {
-  console.log(`📤 دریافت تیم با ID: ${id} (GET /team/${id})`);
-  return api.get<TeamResponse>(`/team/${id}`);
+  console.log(`📤 دریافت تیم با ID: ${id} (GET /support/team/${id})`);
+
+  const response = await fetch(`${SUPPORT_API_URL}/support/team/${id}`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('❌ خطا در دریافت تیم:', errorText);
+    throw new Error(`خطا در دریافت تیم: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
 };
 
-// ✅ 4. به‌روزرسانی تیم - PATCH /team/{teamId}
+// ✅ 4. به‌روزرسانی تیم - PATCH /support/team/{teamId}
 export const updateTeam = async (
   id: number,
   data: UpdateTeamDto
 ): Promise<TeamResponse> => {
-  console.log(`📤 به‌روزرسانی تیم با ID: ${id} (PATCH /team/${id})`, data);
-  return api.patch<TeamResponse>(`/team/${id}`, data);
+  console.log(`📤 به‌روزرسانی تیم با ID: ${id} (PATCH /support/team/${id})`, data);
+
+  const response = await fetch(`${SUPPORT_API_URL}/support/team/${id}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('❌ خطا در به‌روزرسانی تیم:', errorText);
+    throw new Error(`خطا در به‌روزرسانی تیم: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
 };
 
-// ✅ 5. حذف تیم - DELETE /team/{teamId}
+// ✅ 5. حذف تیم - DELETE /support/team/{teamId}
 export const deleteTeam = async (id: number): Promise<boolean> => {
-  console.log(`📤 حذف تیم با ID: ${id} (DELETE /team/${id})`);
-  return api.delete<boolean>(`/team/${id}`);
+  console.log(`📤 حذف تیم با ID: ${id} (DELETE /support/team/${id})`);
+
+  const response = await fetch(`${SUPPORT_API_URL}/support/team/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('❌ خطا در حذف تیم:', errorText);
+    throw new Error(`خطا در حذف تیم: ${response.status} - ${errorText}`);
+  }
+
+  return true;
 };
