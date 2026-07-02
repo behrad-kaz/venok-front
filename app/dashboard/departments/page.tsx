@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Plus, Loader2 } from "lucide-react";
+import { Search, Plus, Users, Loader2 } from "lucide-react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import RoleGuard from "@/components/dashboard/RoleGuard";
 import { Department } from "@/components/dashboard/departments/types";
@@ -76,8 +76,21 @@ export default function DepartmentsPage() {
     }
   }, [showError]);
 
+  // ✅ استفاده از useEffect با یک ref برای جلوگیری از رندرهای اضافی
   useEffect(() => {
-    loadDepartments();
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      if (isMounted) {
+        await loadDepartments();
+      }
+    };
+    
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [loadDepartments]);
 
   // ✅ فیلتر کردن دپارتمان‌ها
@@ -304,7 +317,7 @@ export default function DepartmentsPage() {
             <div className="text-center py-12 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-dashed border-[rgba(255,255,255,0.1)]">
               <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400">هیچ دپارتمانی یافت نشد</p>
-              <p className="text-xs text-gray-500 mt-1">برای ایجاد دپارتمان جدید، روی دکمه "+" کلیک کنید.</p>
+              <p className="text-xs text-gray-500 mt-1">برای ایجاد دپارتمان جدید، روی دکمه &quot;+&quot; کلیک کنید.</p>
             </div>
           )}
         </div>

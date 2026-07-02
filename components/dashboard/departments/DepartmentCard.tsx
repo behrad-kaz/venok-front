@@ -52,6 +52,9 @@ export default function DepartmentCard({
 }: DepartmentCardProps) {
   const badge = getStatusBadge(department.status, department.statusType);
 
+  // لینک به صفحه اعضا با پارامتر دپارتمان
+  const membersLink = `/dashboard/members?department=${department.id}`;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -129,7 +132,7 @@ export default function DepartmentCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link
-            href={`/dashboard/members?department=${department.id}`}
+            href={membersLink}
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
           >
             مشاهده اعضا
