@@ -3,13 +3,15 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Users, MessageCircle, Eye, Edit, MoreHorizontal } from "lucide-react";
+import { Users, MessageCircle, Edit, MoreHorizontal, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Department } from "./types";
 
 interface DepartmentCardProps {
   department: Department;
   index: number;
   onEdit: (dept: Department) => void;
+  onDelete: (id: number, name: string) => void;
+  onToggleStatus: (id: number, currentStatus: "active" | "inactive") => void;
 }
 
 const getStatusBadge = (status: Department["status"], statusType: Department["statusType"]) => {
@@ -41,7 +43,13 @@ const getStatusBadge = (status: Department["status"], statusType: Department["st
   };
 };
 
-export default function DepartmentCard({ department, index, onEdit }: DepartmentCardProps) {
+export default function DepartmentCard({ 
+  department, 
+  index, 
+  onEdit, 
+  onDelete, 
+  onToggleStatus 
+}: DepartmentCardProps) {
   const badge = getStatusBadge(department.status, department.statusType);
 
   return (
@@ -78,12 +86,29 @@ export default function DepartmentCard({ department, index, onEdit }: Department
             </div>
           </div>
         </div>
-        <button
-          onClick={() => onEdit(department)}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
-        >
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onToggleStatus(department.id, department.status)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
+            title={department.status === "active" ? "غیرفعال کردن" : "فعال کردن"}
+          >
+            {department.status === "active" ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={() => onEdit(department)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
+            title="ویرایش"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onDelete(department.id, department.name)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-[rgba(255,107,107,0.05)] transition-all"
+            title="حذف"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-3 mb-4 p-3 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">

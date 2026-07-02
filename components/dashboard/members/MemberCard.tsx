@@ -3,19 +3,21 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
 import { Member } from "./types";
 
 interface MemberCardProps {
   member: Member;
   index: number;
   onEdit: (member: Member) => void;
+  onDelete?: (member: Member) => void;
 }
 
 const getInitials = (firstName: string, lastName: string) => {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`;
 };
 
-export default function MemberCard({ member, index, onEdit }: MemberCardProps) {
+export default function MemberCard({ member, index, onEdit, onDelete }: MemberCardProps) {
   const fullName = `${member.firstName} ${member.lastName}`;
   const initials = getInitials(member.firstName, member.lastName);
 
@@ -73,11 +75,11 @@ export default function MemberCard({ member, index, onEdit }: MemberCardProps) {
           <div className="grid grid-cols-2 gap-3 mb-4 p-3 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
             <div>
               <p className="text-xs text-gray-500 mb-1">شماره همراه</p>
-              <p className="text-sm text-white font-medium" dir="ltr">{member.phone}</p>
+              <p className="text-sm text-white font-medium" dir="ltr">{member.phone || "ثبت نشده"}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">دپارتمان</p>
-              <p className="text-sm text-white font-medium">{member.departmentName}</p>
+              <p className="text-sm text-white font-medium">{member.departmentName || "ثبت نشده"}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">آخرین فعالیت</p>
@@ -91,7 +93,7 @@ export default function MemberCard({ member, index, onEdit }: MemberCardProps) {
 
           <div className="flex items-center gap-2 flex-wrap">
             <Link
-              href={`/dashboard/requests?member=${member.id}`}
+              href={`/dashboard/conversations?member=${member.id}`}
               className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
             >
               مشاهده گفتگوها
@@ -102,6 +104,15 @@ export default function MemberCard({ member, index, onEdit }: MemberCardProps) {
             >
               ویرایش
             </button>
+            {onDelete && (
+              <button
+                onClick={() => onDelete(member)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[rgba(255,107,107,0.08)] text-red-400 border border-[rgba(255,107,107,0.15)] hover:bg-[rgba(255,107,107,0.12)] transition-all flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                حذف
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -13,6 +13,7 @@ export interface Member {
   lastActivity: string;
   openTickets: number;
   avatar?: string;
+  staffId?: number; // ✅ اضافه شد
 }
 
 export interface Department {

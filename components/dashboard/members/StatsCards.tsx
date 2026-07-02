@@ -8,7 +8,7 @@ interface StatsCardsProps {
   stats: {
     totalMembers: number;
     managersCount: number;
-    activeStaffCount: number;
+    activeMembersCount: number; // ✅ تغییر نام
     inactiveMembersCount: number;
   };
 }
@@ -17,7 +17,7 @@ export default function StatsCards({ stats }: StatsCardsProps) {
   const cards = [
     { id: 1, title: "کل اعضا", value: stats.totalMembers, icon: Users, color: "#59D8C3" },
     { id: 2, title: "مدیران دپارتمان", value: stats.managersCount, icon: UserCog, color: "#59D8C3" },
-    { id: 3, title: "کارمندان فعال", value: stats.activeStaffCount, icon: UsersRound, color: "#5BE0A8" },
+    { id: 3, title: "اعضای فعال", value: stats.activeMembersCount, icon: UsersRound, color: "#5BE0A8" }, 
     { id: 4, title: "اعضای غیرفعال", value: stats.inactiveMembersCount, icon: UserX, color: "#FF6B6B" },
   ];
 

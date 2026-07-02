@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Eye, EyeOff } from "lucide-react";
+import { X, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useModal } from "@/components/ui/modal";
 import { Department, Member } from "./types";
 
@@ -12,9 +12,7 @@ interface MemberSidebarProps {
   editingMember: Member | null;
   departments: Department[];
   onSave: (data: {
-    firstName: string;
-    lastName: string;
-    username: string;
+    fullName: string;
     phone: string;
     departmentId: number;
     role: "مدیر دپارتمان" | "کارمند";
@@ -23,6 +21,7 @@ interface MemberSidebarProps {
   }) => void;
   title: string;
   subtitle?: string;
+  isSubmitting?: boolean;
 }
 
 export default function MemberSidebar({
@@ -33,48 +32,39 @@ export default function MemberSidebar({
   onSave,
   title,
   subtitle,
+  isSubmitting = false,
 }: MemberSidebarProps) {
   const { showWarning, showError, showSuccess } = useModal();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [departmentId, setDepartmentId] = useState<number>(0);
   const [role, setRole] = useState<"مدیر دپارتمان" | "کارمند">("کارمند");
   const [status, setStatus] = useState<"active" | "inactive">("active");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const isInitialized = useRef(false);
 
   useEffect(() => {
     if (editingMember) {
-      setFirstName(editingMember.firstName);
-      setLastName(editingMember.lastName);
-      setUsername(editingMember.username);
-      setPhone(editingMember.phone);
-      setDepartmentId(editingMember.departmentId);
-      setRole(editingMember.role);
-      setStatus(editingMember.status);
+      const name = `${editingMember.firstName || ''} ${editingMember.lastName || ''}`.trim();
+      setFullName(name || "");
+      setPhone(editingMember.phone || "");
+      setDepartmentId(editingMember.departmentId || 0);
+      setRole(editingMember.role || "کارمند");
+      setStatus(editingMember.status || "active");
       setPassword("");
-      setConfirmPassword("");
     } else {
-      setFirstName("");
-      setLastName("");
-      setUsername("");
+      setFullName("");
       setPhone("");
       setDepartmentId(0);
       setRole("کارمند");
       setStatus("active");
       setPassword("");
-      setConfirmPassword("");
     }
     isInitialized.current = true;
   }, [editingMember]);
 
-  // ✅ گوش دادن به رویداد modalOpened برای بستن سایدبار
   useEffect(() => {
     if (!isOpen) return;
 
@@ -83,7 +73,6 @@ export default function MemberSidebar({
       onClose();
     };
 
-    // گوش دادن به رویداد سفارشی
     window.addEventListener('modalOpened', handleModalOpened);
 
     return () => {
@@ -91,12 +80,10 @@ export default function MemberSidebar({
     };
   }, [isOpen, onClose]);
 
-  // ✅ همچنین با MutationObserver هم بررسی می‌کنیم
   useEffect(() => {
     if (!isOpen) return;
 
     const observer = new MutationObserver(() => {
-      // بررسی وجود مودال در DOM
       const modalOverlay = document.querySelector('.fixed.inset-0.z-\\[1000\\], .fixed.inset-0.z-\\[1001\\]');
       if (modalOverlay) {
         console.log('🔴 مودال در DOM تشخیص داده شد، بستن سایدبار...');
@@ -117,7 +104,9 @@ export default function MemberSidebar({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!firstName || !lastName || !username || !phone || !departmentId) {
+    if (isSubmitting) return;
+    
+    if (!fullName.trim() || !phone.trim() || !departmentId) {
       showWarning("لطفاً تمام فیلدهای الزامی را پر کنید", "خطا در فرم");
       return;
     }
@@ -127,37 +116,43 @@ export default function MemberSidebar({
         showWarning("رمز عبور باید حداقل ۸ کاراکتر باشد", "خطا در رمز عبور");
         return;
       }
-      
-      if (password !== confirmPassword) {
-        showWarning("رمز عبور و تکرار آن مطابقت ندارند", "خطا در تکرار رمز");
-        return;
-      }
+    }
+    
+    if (editingMember && password && password.length < 8) {
+      showWarning("رمز عبور باید حداقل ۸ کاراکتر باشد", "خطا در رمز عبور");
+      return;
     }
     
     const phoneRegex = /^09[0-9]{9}$/;
-    if (!phoneRegex.test(phone)) {
+    if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
       showWarning("شماره همراه باید با 09 شروع شود و ۱۱ رقم باشد", "خطا در شماره همراه");
       return;
     }
     
-    if (username.length < 3) {
-      showWarning("نام کاربری باید حداقل ۳ کاراکتر باشد", "خطا در نام کاربری");
-      return;
-    }
-    
-    onSave({
-      firstName,
-      lastName,
-      username,
-      phone,
+    const saveData: {
+      fullName: string;
+      phone: string;
+      departmentId: number;
+      role: "مدیر دپارتمان" | "کارمند";
+      status: "active" | "inactive";
+      password?: string;
+    } = {
+      fullName: fullName.trim(),
+      phone: phone.trim(),
       departmentId,
       role,
       status,
-      ...(password && { password }),
-    });
+    };
     
-    const actionText = editingMember ? "ویرایش" : "افزودن";
-    showSuccess(`عضو با موفقیت ${actionText} شد`, "موفقیت ✨");
+    if (password) {
+      saveData.password = password;
+    }
+    
+    onSave(saveData);
+  };
+
+  const handleClose = () => {
+    if (isSubmitting) return;
     onClose();
   };
 
@@ -167,7 +162,7 @@ export default function MemberSidebar({
     <>
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90]" 
-        onClick={onClose} 
+        onClick={handleClose} 
       />
       
       <div className="fixed left-0 top-0 bottom-0 w-full max-w-md bg-[rgba(9,22,18,0.98)] border-l border-[rgba(255,255,255,0.1)] z-[100] overflow-y-auto shadow-2xl">
@@ -178,8 +173,9 @@ export default function MemberSidebar({
               {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
             </div>
             <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[rgba(255,255,255,0.05)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <X className="w-4 h-4" />
             </button>
@@ -188,46 +184,17 @@ export default function MemberSidebar({
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                نام <span className="text-red-400">*</span>
+                نام و نام خانوادگی <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="نام عضو"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="مثال: علی محمدی"
                 required
-                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                نام خانوادگی <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="نام خانوادگی عضو"
-                required
-                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                نام کاربری <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="username"
-                required
-                dir="ltr"
-                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
-              />
-              <p className="text-xs text-gray-500 mt-1">حداقل ۳ کاراکتر</p>
             </div>
 
             <div>
@@ -241,63 +208,40 @@ export default function MemberSidebar({
                 placeholder="09123456789"
                 required
                 dir="ltr"
-                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <p className="text-xs text-gray-500 mt-1">شماره همراه باید با 09 شروع شود</p>
             </div>
 
-            {!editingMember && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    رمز عبور اولیه <span className="text-red-400">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="حداقل ۸ کاراکتر"
-                      required
-                      minLength={8}
-                      className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">رمز عبور باید حداقل ۸ کاراکتر باشد</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    تکرار رمز عبور <span className="text-red-400">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="تکرار رمز عبور"
-                      required
-                      minLength={8}
-                      className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-                    >
-                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {editingMember ? "رمز عبور جدید (اختیاری)" : "رمز عبور اولیه"} <span className="text-red-400">{!editingMember ? "*" : ""}</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={editingMember ? "برای تغییر رمز عبور وارد کنید" : "حداقل ۸ کاراکتر"}
+                  required={!editingMember}
+                  minLength={8}
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isSubmitting}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {editingMember ? "در صورت تمایل رمز عبور را تغییر دهید" : "رمز عبور باید حداقل ۸ کاراکتر باشد"}
+              </p>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -307,11 +251,12 @@ export default function MemberSidebar({
                 value={departmentId}
                 onChange={(e) => setDepartmentId(parseInt(e.target.value))}
                 required
-                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white focus:outline-none focus:border-[#59D8C3] transition-colors cursor-pointer"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white focus:outline-none focus:border-[#59D8C3] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value={0}>انتخاب دپارتمان</option>
+                <option value={0} className="bg-[#0D1B17] text-white">انتخاب دپارتمان</option>
                 {departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
+                  <option key={dept.id} value={dept.id} className="bg-[#0D1B17] text-white hover:bg-[rgba(89,216,195,0.1)]">
                     {dept.name}
                   </option>
                 ))}
@@ -326,22 +271,24 @@ export default function MemberSidebar({
                 <button
                   type="button"
                   onClick={() => setRole("کارمند")}
+                  disabled={isSubmitting}
                   className={`px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
                     role === "کارمند"
                       ? "bg-[rgba(89,216,195,0.12)] border-[rgba(89,216,195,0.25)] text-[#59D8C3]"
                       : "bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)] text-gray-500 hover:text-white"
-                  }`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   کارمند
                 </button>
                 <button
                   type="button"
                   onClick={() => setRole("مدیر دپارتمان")}
+                  disabled={isSubmitting}
                   className={`px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
                     role === "مدیر دپارتمان"
                       ? "bg-[rgba(89,216,195,0.12)] border-[rgba(89,216,195,0.25)] text-[#59D8C3]"
                       : "bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)] text-gray-500 hover:text-white"
-                  }`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   مدیر دپارتمان
                 </button>
@@ -354,22 +301,24 @@ export default function MemberSidebar({
                 <button
                   type="button"
                   onClick={() => setStatus("active")}
+                  disabled={isSubmitting}
                   className={`px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
                     status === "active"
                       ? "bg-[rgba(89,216,195,0.12)] border-[rgba(89,216,195,0.25)] text-[#59D8C3]"
                       : "bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)] text-gray-500 hover:text-white"
-                  }`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   فعال
                 </button>
                 <button
                   type="button"
                   onClick={() => setStatus("inactive")}
+                  disabled={isSubmitting}
                   className={`px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
                     status === "inactive"
                       ? "bg-[rgba(89,216,195,0.12)] border-[rgba(89,216,195,0.25)] text-[#59D8C3]"
                       : "bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)] text-gray-500 hover:text-white"
-                  }`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   غیرفعال
                 </button>
@@ -379,16 +328,25 @@ export default function MemberSidebar({
             <div className="flex gap-3 pt-4 border-t border-[rgba(255,255,255,0.1)]">
               <button
                 type="button"
-                onClick={onClose}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all"
+                onClick={handleClose}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 انصراف
               </button>
               <button
                 type="submit"
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] hover:shadow-lg transition-all"
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {editingMember ? "ذخیره تغییرات" : "افزودن عضو"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    در حال ذخیره...
+                  </>
+                ) : (
+                  editingMember ? "ذخیره تغییرات" : "افزودن عضو"
+                )}
               </button>
             </div>
           </form>

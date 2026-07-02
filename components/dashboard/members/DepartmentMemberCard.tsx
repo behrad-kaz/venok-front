@@ -1,3 +1,4 @@
+// components/dashboard/members/DepartmentMemberCard.tsx
 "use client";
 
 import { motion } from "framer-motion";

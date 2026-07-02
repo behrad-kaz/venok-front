@@ -16,11 +16,19 @@ interface DepartmentSidebarProps {
   } | null;
   onSave: (data: { name: string; description: string; status: "active" | "inactive"; color: string }) => void;
   title: string;
+  isSubmitting?: boolean;
 }
 
 const colorOptions = ["#59D8C3", "#F2B84B", "#8B7FDF", "#FF6B6B", "#9CA3AF"];
 
-export default function DepartmentSidebar({ isOpen, onClose, editingDepartment, onSave, title }: DepartmentSidebarProps) {
+export default function DepartmentSidebar({ 
+  isOpen, 
+  onClose, 
+  editingDepartment, 
+  onSave, 
+  title,
+  isSubmitting = false 
+}: DepartmentSidebarProps) {
   const [name, setName] = useState(editingDepartment?.name || "");
   const [description, setDescription] = useState(editingDepartment?.description || "");
   const [status, setStatus] = useState<"active" | "inactive">(editingDepartment?.status || "active");
@@ -44,7 +52,6 @@ export default function DepartmentSidebar({ isOpen, onClose, editingDepartment, 
     e.preventDefault();
     if (!name.trim() || !description.trim()) return;
     onSave({ name, description, status, color: selectedColor });
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -72,7 +79,8 @@ export default function DepartmentSidebar({ isOpen, onClose, editingDepartment, 
                 onChange={(e) => setName(e.target.value)}
                 placeholder="مثال: پشتیبانی، فروش، مالی"
                 required
-                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors disabled:opacity-50"
               />
             </div>
 
@@ -86,7 +94,8 @@ export default function DepartmentSidebar({ isOpen, onClose, editingDepartment, 
                 placeholder="توضیح مختصری درباره وظایف این دپارتمان"
                 required
                 rows={3}
-                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors resize-none"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors resize-none disabled:opacity-50"
               />
             </div>
 
@@ -96,22 +105,24 @@ export default function DepartmentSidebar({ isOpen, onClose, editingDepartment, 
                 <button
                   type="button"
                   onClick={() => setStatus("active")}
+                  disabled={isSubmitting}
                   className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
                     status === "active"
                       ? "bg-[rgba(89,216,195,0.12)] border-[rgba(89,216,195,0.25)] text-[#59D8C3]"
                       : "bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)] text-gray-500 hover:text-white"
-                  }`}
+                  } disabled:opacity-50`}
                 >
                   فعال
                 </button>
                 <button
                   type="button"
                   onClick={() => setStatus("inactive")}
+                  disabled={isSubmitting}
                   className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
                     status === "inactive"
                       ? "bg-[rgba(89,216,195,0.12)] border-[rgba(89,216,195,0.25)] text-[#59D8C3]"
                       : "bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)] text-gray-500 hover:text-white"
-                  }`}
+                  } disabled:opacity-50`}
                 >
                   غیرفعال
                 </button>
@@ -126,9 +137,10 @@ export default function DepartmentSidebar({ isOpen, onClose, editingDepartment, 
                     key={color}
                     type="button"
                     onClick={() => setSelectedColor(color)}
+                    disabled={isSubmitting}
                     className={`w-10 h-10 rounded-lg transition-all ${
                       selectedColor === color ? "ring-2 ring-white scale-110" : "hover:scale-105"
-                    }`}
+                    } disabled:opacity-50`}
                     style={{ backgroundColor: color }}
                   />
                 ))}
@@ -136,11 +148,27 @@ export default function DepartmentSidebar({ isOpen, onClose, editingDepartment, 
             </div>
 
             <div className="flex gap-3 pt-4 border-t border-[rgba(255,255,255,0.1)]">
-              <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all disabled:opacity-50"
+              >
                 انصراف
               </button>
-              <button type="submit" className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] hover:shadow-lg transition-all">
-                {editingDepartment ? "ذخیره تغییرات" : "ایجاد دپارتمان"}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F] hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-[#06110F] border-t-transparent rounded-full animate-spin" />
+                    در حال ذخیره...
+                  </>
+                ) : (
+                  editingDepartment ? "ذخیره تغییرات" : "ایجاد دپارتمان"
+                )}
               </button>
             </div>
           </form>
