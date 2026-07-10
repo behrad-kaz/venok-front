@@ -2,67 +2,98 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { MessageCircle } from 'lucide-react';
+import { WidgetConfig } from './types';
 
 interface WidgetPreviewTabProps {
-  primaryColor?: string;
-  buttonText?: string;
-  buttonStyle?: "circle" | "capsule";
-  buttonSize?: "small" | "medium" | "large";
+  config: WidgetConfig;
 }
 
 type PreviewMode = "desktop" | "mobile";
-type PreviewState = "button" | "form" | "success" | "error";
+type PreviewState = "button" | "form" | "success";
 
-export default function WidgetPreviewTab({ 
-  primaryColor = "#59d8c3",
-  buttonText = "گفتگو با پشتیبانی",
-  buttonStyle = "capsule",
-  buttonSize = "medium"
-}: WidgetPreviewTabProps) {
+export default function WidgetPreviewTab({ config }: WidgetPreviewTabProps) {
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [previewState, setPreviewState] = useState<PreviewState>("button");
 
-  // محاسبه ارتفاع دکمه بر اساس اندازه
-  const getButtonHeight = () => {
+  const primaryColor = config.primaryColor || '#14b8a6';
+  const companyName = config.companyName || 'پشتیبان‌یار';
+  const logoUrl = config.logoUrl;
+  const formTitle = config.formTitle || 'چطور می‌تونیم کمکتون کنیم؟';
+  const formDescription = config.formDescription || 'موضوع گفتگو را انتخاب کنید تا شما را به تیم مناسب وصل کنیم.';
+  const phonePlaceholder = config.phonePlaceholder || 'شماره همراه خود را وارد کنید';
+  const submitButtonText = config.submitButtonText || 'شروع گفتگو';
+  const privacyText = config.privacyText || 'با ثبت شماره، لینک گفتگو از طریق پیامک برای شما ارسال می‌شود.';
+  const showDepartmentSelect = config.showDepartmentSelect !== undefined ? config.showDepartmentSelect : true;
+  const showDescriptionField = config.showDescriptionField !== undefined ? config.showDescriptionField : true;
+  const descriptionRequired = config.descriptionRequired || false;
+  const departments = config.departments || [];
+  const buttonSize = config.buttonSize || 'md';
+  const buttonPosition = config.buttonPosition || 'bottom-right';
+
+  // محاسبه اندازه دکمه
+  const getButtonSize = () => {
     switch (buttonSize) {
-      case "small": return "48px";
-      case "large": return "72px";
-      default: return "56px";
+      case 'sm': return 'w-14 h-14';
+      case 'lg': return 'w-20 h-20';
+      default: return 'w-16 h-16';
     }
   };
 
-  // محاسبه padding دکمه بر اساس اندازه و حالت
-  const getButtonPadding = () => {
-    switch (buttonSize) {
-      case "small": return "0 16px";
-      case "large": return "0 32px";
-      default: return "0 24px";
+  // موقعیت دکمه
+  const getPositionClass = () => {
+    return buttonPosition === 'bottom-right' ? 'right-6' : 'left-6';
+  };
+
+  // استایل دایره پالسی
+  const pulseRingStyle = {
+    animation: 'pulseRing 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+  };
+
+  // ✅ تعیین عرض فرم بر اساس حالت
+  const getFormWidth = () => {
+    if (previewMode === 'mobile') {
+      return 'w-[220px]'; // عرض کمتر برای موبایل
     }
+    return 'w-[380px]'; // عرض معمولی برای دسکتاپ
   };
 
-  // محاسبه عرض دکمه در حالت دایره
-  const getButtonWidth = () => {
-    if (buttonStyle === "circle") {
-      return getButtonHeight(); // عرض برابر با ارتفاع برای شکل دایره
+  // ✅ تعیین padding فرم بر اساس حالت
+  const getFormPadding = () => {
+    if (previewMode === 'mobile') {
+      return 'p-2'; // padding کمتر برای موبایل
     }
-    return "auto";
+    return 'p-5'; // padding معمولی برای دسکتاپ
   };
 
-  const getButtonRadius = () => {
-    return buttonStyle === "circle" ? "50%" : "32px";
+  // ✅ تعیین اندازه فونت‌ها بر اساس حالت
+  const getTextSize = () => {
+    if (previewMode === 'mobile') {
+      return {
+        title: 'text-xs',
+        description: 'text-[6px]',
+        label: 'text-[6px]',
+        input: 'text-xs',
+        button: 'text-xs',
+        privacy: 'text-[9px]',
+      };
+    }
+    return {
+      title: 'text-base',
+      description: 'text-xs',
+      label: 'text-sm',
+      input: 'text-sm',
+      button: 'text-sm',
+      privacy: 'text-[10px]',
+    };
   };
 
-  const buttonHeight = getButtonHeight();
-  const buttonWidth = getButtonWidth();
-  const buttonRadius = getButtonRadius();
-  const buttonPadding = getButtonPadding();
-
-  // تعیین اینکه آیا متن نمایش داده شود (در حالت دایره، متن نمایش داده نمی‌شود)
-  const showText = buttonStyle !== "circle";
+  const textSize = getTextSize();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="p-6 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
         {/* هدر */}
         <div className="flex items-center justify-between mb-5">
@@ -93,7 +124,7 @@ export default function WidgetPreviewTab({
 
         {/* دکمه‌های حالت */}
         <div className="flex items-center gap-3 mb-5">
-          {(["button", "form", "success", "error"] as PreviewState[]).map((state) => (
+          {(["button", "form", "success"] as PreviewState[]).map((state) => (
             <button
               key={state}
               onClick={() => setPreviewState(state)}
@@ -106,211 +137,153 @@ export default function WidgetPreviewTab({
               {state === "button" && "دکمه"}
               {state === "form" && "فرم"}
               {state === "success" && "موفقیت"}
-              {state === "error" && "خطا"}
             </button>
           ))}
         </div>
 
-        {/* محفظه پیش‌نمایش - حالت دسکتاپ */}
-        {previewMode === "desktop" && (
-          <div 
-            className="rounded-2xl bg-gradient-to-br from-[#0a3d35] to-[#050f0d] border border-[rgba(255,255,255,0.1)] overflow-hidden"
-            style={{ height: "500px", position: "relative" }}
-          >
-            {previewState === "button" && (
-              <button 
-                style={{ 
-                  position: "absolute",
-                  left: "24px",
-                  bottom: "24px",
+        {/* محفظه پیش‌نمایش */}
+        <div 
+          className={` rounded-2xl bg-gradient-to-br from-[#0a3d35] to-[#050f0d] border border-[rgba(255,255,255,0.1)] overflow-hidden relative ${
+            previewMode === "mobile" ? "mx-auto w-[300px]" : "w-full"
+          }`}
+          style={{ height: previewMode === "mobile" ? "600px" : "500px" }}
+        >
+          {/* دکمه ویجت */}
+          {previewState === "button" && (
+            <motion.button
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", damping: 20, stiffness: 300 }}
+              className={`absolute bottom-6 ${getPositionClass()} ${getButtonSize()} rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform z-10`}
+              style={{ backgroundColor: primaryColor }}
+            >
+              <MessageCircle className={`${previewMode === 'mobile' ? 'w-5 h-5' : 'w-6 h-6'} text-white`} strokeWidth={2} />
+              
+              <div 
+                className="absolute inset-0 rounded-full -z-10"
+                style={{
+                  ...pulseRingStyle,
                   backgroundColor: primaryColor,
-                  height: buttonHeight,
-                  width: buttonWidth,
-                  borderRadius: buttonRadius,
-                  padding: buttonPadding,
-                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                  transition: "transform 0.2s",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
+                  opacity: 0.5,
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-                onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-              >
-                <div className="flex items-center gap-2 text-white">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {showText && (
-                    <span className="font-medium text-sm whitespace-nowrap">{buttonText}</span>
-                  )}
-                </div>
-              </button>
-            )}
+              />
+            </motion.button>
+          )}
 
-            {/* فرم شروع گفتگو - بدون تغییر */}
-            {previewState === "form" && (
-              <div style={{ position: "absolute", left: "24px", bottom: "24px", width: "320px" }} className="rounded-2xl bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border border-[rgba(255,255,255,0.1)] shadow-2xl overflow-hidden">
-                <div className="p-4 border-b border-[rgba(255,255,255,0.1)]" style={{ backgroundColor: primaryColor + "15" }}>
-                  <p className="text-sm font-bold text-white">چطور می‌تونیم کمکتون کنیم؟</p>
-                  <p className="text-xs text-gray-400 mt-1">موضوع گفتگو را انتخاب کنید تا شما را به تیم مناسب وصل کنیم.</p>
+          {/* فرم شروع گفتگو */}
+          {previewState === "form" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className={`absolute bottom-6 ${getPositionClass()} ${getFormWidth()} max-w-[calc(100vw-3rem)] bg-white rounded-2xl shadow-2xl overflow-hidden`}
+            >
+              {/* هدر فرم */}
+              <div className={`${getFormPadding()} text-white relative`} style={{ backgroundColor: primaryColor }}>
+                <div className="flex items-center gap-3 mb-3">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt={companyName} className={`${previewMode === 'mobile' ? 'w-8 h-8' : 'w-10 h-10'} rounded-lg object-contain bg-white/10 p-1`} />
+                  ) : (
+                    <div className={`${previewMode === 'mobile' ? 'w-8 h-8' : 'w-10 h-10'} rounded-lg bg-white/10 flex items-center justify-center text-white font-bold ${previewMode === 'mobile' ? 'text-base' : 'text-lg'}`}>
+                      {companyName.charAt(0)}
+                    </div>
+                  )}
+                  <h3 className={`font-bold ${previewMode === 'mobile' ? 'text-sm' : 'text-base'} truncate`}>{companyName}</h3>
                 </div>
-                <div className="p-4 space-y-4">
+                <h4 className={`font-bold ${previewMode === 'mobile' ? 'text-base' : 'text-lg'}`}>{formTitle}</h4>
+                <p className={`${previewMode === 'mobile' ? 'text-[10px]' : 'text-sm'} opacity-90 mt-1`}>{formDescription}</p>
+              </div>
+
+              {/* فرم */}
+              <div className={`${getFormPadding()} `}>
+                {showDepartmentSelect && departments.length > 0 && (
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">موضوع گفتگو</label>
-                    <select className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] text-white text-sm">
-                      <option>مشکل پرداخت</option>
-                      <option>سوال قبل از خرید</option>
-                      <option>پیگیری سفارش</option>
+                    <label className={`block ${textSize.label} font-medium text-gray-700 mb-1`}>
+                      دپارتمان <span className="text-red-500 mr-1">*</span>
+                    </label>
+                    <select className={`w-full ${previewMode === 'mobile' ? 'px-3 py-2 text-xs' : 'px-4 py-2 text-sm'} rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30`}>
+                      <option value="">انتخاب کنید</option>
+                      {departments.filter(d => d.isActive).map((dept) => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
                     </select>
                   </div>
+                )}
+
+                <div>
+                  <label className={`block ${textSize.label} font-medium text-gray-700 mb-1`}>
+                    شماره همراه <span className="text-red-500 mr-1">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder={phonePlaceholder}
+                    className={`w-full ${previewMode === 'mobile' ? 'px-3 py-2 text-xs' : 'px-4 py-2 text-sm'} rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30`}
+                    dir="ltr"
+                  />
+                </div>
+
+                {showDescriptionField && (
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">شماره همراه</label>
-                    <input type="tel" placeholder="شماره همراه خود را وارد کنید" className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] text-white text-sm placeholder:text-gray-500" />
+                    <label className={`block ${textSize.label} font-medium text-gray-700 mb-1`}>
+                      توضیحات {descriptionRequired && <span className="text-red-500 mr-1">*</span>}
+                    </label>
+                    <textarea
+                      placeholder="توضیحات بیشتر..."
+                      rows={previewMode === 'mobile' ? 2 : 2}
+                      className={`w-full ${previewMode === 'mobile' ? 'px-3 py-2 text-xs' : 'px-4 py-2 text-sm'} rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none`}
+                    />
                   </div>
-                  <button className="w-full py-2 rounded-lg text-sm font-medium transition-all" style={{ backgroundColor: primaryColor, color: "#06110F" }}>
-                    شروع گفتگو
-                  </button>
-                  <p className="text-[10px] text-gray-500 text-center">با ارسال شماره همراه، شرایط و قوانین را می‌پذیرید.</p>
-                </div>
-              </div>
-            )}
+                )}
 
-            {/* موفقیت - بدون تغییر */}
-            {previewState === "success" && (
-              <div style={{ position: "absolute", left: "24px", bottom: "24px", width: "320px" }} className="rounded-2xl bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border border-[rgba(91,224,168,0.3)] shadow-2xl overflow-hidden">
-                <div className="p-4 text-center">
-                  <div className="w-12 h-12 rounded-full bg-[rgba(91,224,168,0.15)] flex items-center justify-center mx-auto mb-3">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5be0a8" strokeWidth="2">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-white">لینک گفتگو برای شما پیامک شد.</p>
-                  <p className="text-xs text-gray-500 mt-2">لطفاً صندوق پیامک خود را بررسی کنید.</p>
-                </div>
-              </div>
-            )}
+                <button
+                  className={`w-full ${previewMode === 'mobile' ? 'py-2 text-xs' : 'py-3 text-sm'} rounded-xl text-white font-bold transition-all hover:opacity-90`}
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  {submitButtonText}
+                </button>
 
-            {/* خطا - بدون تغییر */}
-            {previewState === "error" && (
-              <div style={{ position: "absolute", left: "24px", bottom: "24px", width: "320px" }} className="rounded-2xl bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border border-[rgba(255,107,107,0.3)] shadow-2xl overflow-hidden">
-                <div className="p-4 text-center">
-                  <div className="w-12 h-12 rounded-full bg-[rgba(255,107,107,0.15)] flex items-center justify-center mx-auto mb-3">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-white">شماره همراه وارد شده معتبر نیست.</p>
-                  <p className="text-xs text-gray-500 mt-2">لطفاً شماره را تصحیح کنید و دوباره تلاش کنید.</p>
-                </div>
+                <p className={`${textSize.privacy} text-gray-400 text-center`}>{privacyText}</p>
               </div>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
 
-        {/* محفظه پیش‌نمایش - حالت موبایل */}
-        {previewMode === "mobile" && (
-          <div 
-            className="rounded-2xl bg-gradient-to-br from-[#0a3d35] to-[#050f0d] border border-[rgba(255,255,255,0.1)] overflow-hidden mx-auto"
-            style={{ height: "600px", width: "375px", position: "relative" }}
-          >
-            {previewState === "button" && (
-              <button 
-                style={{ 
-                  position: "absolute",
-                  left: "24px",
-                  bottom: "24px",
-                  backgroundColor: primaryColor,
-                  height: buttonHeight,
-                  width: buttonWidth,
-                  borderRadius: buttonRadius,
-                  padding: buttonPadding,
-                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                  transition: "transform 0.2s",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-                onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-              >
-                <div className="flex items-center gap-2 text-white">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          {/* حالت موفقیت */}
+          {previewState === "success" && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`absolute bottom-6 ${getPositionClass()} ${getFormWidth()} max-w-[calc(100vw-3rem)] bg-white rounded-2xl shadow-2xl overflow-hidden`}
+            >
+              <div className={`${getFormPadding()} text-center`}>
+                <div className={`${previewMode === 'mobile' ? 'w-12 h-12' : 'w-16 h-16'} rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4`}>
+                  <svg width={previewMode === 'mobile' ? "24" : "32"} height={previewMode === 'mobile' ? "24" : "32"} viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  {showText && (
-                    <span className="font-medium text-sm whitespace-nowrap">{buttonText}</span>
-                  )}
                 </div>
-              </button>
-            )}
-
-            {/* فرم شروع گفتگو - بدون تغییر */}
-            {previewState === "form" && (
-              <div style={{ position: "absolute", left: "24px", bottom: "24px", width: "320px" }} className="rounded-2xl bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border border-[rgba(255,255,255,0.1)] shadow-2xl overflow-hidden">
-                <div className="p-4 border-b border-[rgba(255,255,255,0.1)]" style={{ backgroundColor: primaryColor + "15" }}>
-                  <p className="text-sm font-bold text-white">چطور می‌تونیم کمکتون کنیم؟</p>
-                  <p className="text-xs text-gray-400 mt-1">موضوع گفتگو را انتخاب کنید تا شما را به تیم مناسب وصل کنیم.</p>
-                </div>
-                <div className="p-4 space-y-4">
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">موضوع گفتگو</label>
-                    <select className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] text-white text-sm">
-                      <option>مشکل پرداخت</option>
-                      <option>سوال قبل از خرید</option>
-                      <option>پیگیری سفارش</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">شماره همراه</label>
-                    <input type="tel" placeholder="شماره همراه خود را وارد کنید" className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] text-white text-sm placeholder:text-gray-500" />
-                  </div>
-                  <button className="w-full py-2 rounded-lg text-sm font-medium transition-all" style={{ backgroundColor: primaryColor, color: "#06110F" }}>
-                    شروع گفتگو
-                  </button>
-                  <p className="text-[10px] text-gray-500 text-center">با ارسال شماره همراه، شرایط و قوانین را می‌پذیرید.</p>
-                </div>
+                <p className={`${previewMode === 'mobile' ? 'text-sm' : 'text-base'} font-medium text-gray-900 mb-2`}>
+                  {config.successMessage || 'لینک گفتگو برای شما پیامک شد.'}
+                </p>
+                <p className={`${previewMode === 'mobile' ? 'text-[10px]' : 'text-sm'} text-gray-500`}>
+                  لطفاً صندوق پیامک خود را بررسی کنید.
+                </p>
               </div>
-            )}
-
-            {/* موفقیت - بدون تغییر */}
-            {previewState === "success" && (
-              <div style={{ position: "absolute", left: "24px", bottom: "24px", width: "320px" }} className="rounded-2xl bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border border-[rgba(91,224,168,0.3)] shadow-2xl overflow-hidden">
-                <div className="p-4 text-center">
-                  <div className="w-12 h-12 rounded-full bg-[rgba(91,224,168,0.15)] flex items-center justify-center mx-auto mb-3">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5be0a8" strokeWidth="2">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-white">لینک گفتگو برای شما پیامک شد.</p>
-                  <p className="text-xs text-gray-500 mt-2">لطفاً صندوق پیامک خود را بررسی کنید.</p>
-                </div>
-              </div>
-            )}
-
-            {/* خطا - بدون تغییر */}
-            {previewState === "error" && (
-              <div style={{ position: "absolute", left: "24px", bottom: "24px", width: "320px" }} className="rounded-2xl bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border border-[rgba(255,107,107,0.3)] shadow-2xl overflow-hidden">
-                <div className="p-4 text-center">
-                  <div className="w-12 h-12 rounded-full bg-[rgba(255,107,107,0.15)] flex items-center justify-center mx-auto mb-3">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-white">شماره همراه وارد شده معتبر نیست.</p>
-                  <p className="text-xs text-gray-500 mt-2">لطفاً شماره را تصحیح کنید و دوباره تلاش کنید.</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
+        </div>
       </div>
+
+      {/* اضافه کردن استایل keyframe برای pulseRing */}
+      <style jsx>{`
+        @keyframes pulseRing {
+          0% {
+            transform: scale(1);
+            opacity: 0.6;
+          }
+          100% {
+            transform: scale(1.8);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }

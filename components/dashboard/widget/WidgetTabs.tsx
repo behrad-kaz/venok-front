@@ -2,13 +2,7 @@
 
 "use client";
 
-import { 
-  CheckCircle, 
-  Palette, 
-  FileText, 
-  Link, 
-  Eye 
-} from "lucide-react";
+import { CheckCircle, Palette, FileText, Eye } from "lucide-react";
 import { WidgetTabType } from "./types";
 
 interface WidgetTabsProps {
@@ -20,13 +14,12 @@ const tabs: { id: WidgetTabType; label: string; icon: React.ComponentType<{ clas
   { id: "status", label: "وضعیت و نصب", icon: CheckCircle },
   { id: "appearance", label: "ظاهر ویجت", icon: Palette },
   { id: "form", label: "فرم شروع گفتگو", icon: FileText },
-  { id: "referrer", label: "مسیر ارجاع", icon: Link },
   { id: "preview", label: "پیش‌نمایش", icon: Eye },
 ];
 
 export default function WidgetTabs({ activeTab, onTabChange }: WidgetTabsProps) {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto  [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-[rgba(255,255,255,0.05)] [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.3)] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.5)] pb-2">
+    <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-[rgba(255,255,255,0.05)] [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.3)] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.5)] pb-2">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
