@@ -13,32 +13,30 @@ export interface WorkspaceData {
   city?: string;
   postalCode?: string;
   locale?: string;
+  logo?: string; // ← اضافه شد
 }
 
 export interface CompanyInfo {
   name: string;
   phone: string;
   email: string;
-  logo: File | string | null;  // ✅ تغییر به File | string | null
+  logo: File | string | null;
   logoPreview: string | null;
-  logoUrl: string | null;      // ✅ اضافه شد
-  logoId: string | null;      // ✅ اضافه شد
+  logoUrl: string | null;
+  logoId: string | null;
   description?: string;
   domain?: string;
 }
 
 interface OnboardingState {
-  // اطلاعات شرکت
   companyInfo: CompanyInfo;
   workspaceData: WorkspaceData | null;
   workspaceId: string | null;
   
-  // وضعیت‌ها
   isSaving: boolean;
   uploadStatus: 'idle' | 'uploading' | 'success' | 'error';
   uploadError: string | null;
   
-  // Actions
   setCompanyInfo: (info: Partial<CompanyInfo>) => void;
   setWorkspaceData: (data: WorkspaceData | null) => void;
   setWorkspaceId: (id: string | null) => void;

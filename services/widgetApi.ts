@@ -1,9 +1,10 @@
 // services/widgetApi.ts
+import { api } from './api-client';
 
-const SUPPORT_API_URL = 'http://localhost:3004';
+const API_URL = 'http://localhost:3000';
 
 interface WidgetConfigResponse {
-  organizationId: number;
+  id: number;
   workspaceId: number;
   widgetToken: string;
   companyName: string;
@@ -52,59 +53,16 @@ interface UpdateWidgetRequest {
   supportTeamIds?: number[];
 }
 
-// تابع دریافت هدرها با توکن
-const getHeaders = () => {
-  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-  const contextToken = typeof window !== 'undefined' ? localStorage.getItem('contextToken') : null;
-  
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
-  
-  if (contextToken) {
-    headers['x-context-token'] = contextToken;
-  }
-  
-  return headers;
-};
-
 // دریافت تنظیمات فعلی ویجت
 export const getCurrentWidgetConfig = async (): Promise<WidgetConfigResponse> => {
   console.log('📤 دریافت تنظیمات ویجت (GET /widget/current)');
   
-  const response = await fetch(`${SUPPORT_API_URL}/widget/current`, {
-    method: 'GET',
-    headers: getHeaders(),
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('❌ خطا در دریافت تنظیمات ویجت:', errorText);
-    throw new Error(`خطا در دریافت تنظیمات ویجت: ${response.status} - ${errorText}`);
-  }
-  
-  return response.json();
+  return api.get<WidgetConfigResponse>('/widget/current');
 };
 
 // به‌روزرسانی تنظیمات ویجت
 export const updateWidgetConfig = async (data: UpdateWidgetRequest): Promise<WidgetConfigResponse> => {
   console.log('📤 به‌روزرسانی تنظیمات ویجت (PATCH /widget):', data);
   
-  const response = await fetch(`${SUPPORT_API_URL}/widget`, {
-    method: 'PATCH',
-    headers: getHeaders(),
-    body: JSON.stringify(data),
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('❌ خطا در به‌روزرسانی تنظیمات ویجت:', errorText);
-    throw new Error(`خطا در به‌روزرسانی تنظیمات ویجت: ${response.status} - ${errorText}`);
-  }
-  
-  return response.json();
+  return api.patch<WidgetConfigResponse>('/widget', data);
 };

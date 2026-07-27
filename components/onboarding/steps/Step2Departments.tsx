@@ -1,7 +1,8 @@
 // components/onboarding/steps/Step2Departments.tsx
+
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, CheckCircle, Trash2, Edit2, Eye, EyeOff, Building2, Loader2 } from "lucide-react";
 import { Department } from "../types";
 import { 
@@ -16,10 +17,10 @@ import { useModal } from '@/components/ui/modal';
 
 interface Step2DepartmentsProps {
   departments: Department[];
-  onAddDepartment: (dept: Omit<Department, "id">) => void;
+  onAddDepartment: (dept: Department) => void;
   onAddQuickDepartment: (name: string) => void;
-  onRemoveDepartment: (id: string) => void;
-  onToggleStatus: (id: string) => void;
+  onRemoveDepartment: (id: number) => void;
+  onToggleStatus: (id: number) => void;
   onEditDepartment: (dept: Department) => void;
   onSaveEdit: (editedDept: Department) => void;
   onCancelEdit: () => void;
@@ -55,53 +56,116 @@ export default function Step2Departments({
   });
 
   const [localEditingDept, setLocalEditingDept] = useState<Department | null>(null);
-  const [teamMap, setTeamMap] = useState<Map<string, number>>(new Map());
+  const [localDepartments, setLocalDepartments] = useState<Department[]>(departments);
   
-  // ✅ استفاده از useRef برای جلوگیری از بارگذاری مجدد
   const hasLoadedRef = useRef(false);
   const isLoadingRef = useRef(false);
+  // ✅ برای جلوگیری از نمایش پیام تکراری هنگام ویرایش
+  const isEditingRef = useRef(false);
 
-  // ✅ بارگذاری تیم‌های موجود از سرور (فقط یک بار)
+  // ✅ همگام‌سازی localDepartments با props - فقط در صورت تغییر
   useEffect(() => {
-    // ✅ اگر قبلاً بارگذاری شده یا در حال بارگذاری است، انجام نده
-    if (hasLoadedRef.current || isLoadingRef.current) return;
+    const currentIds = localDepartments.map(d => d.id).sort();
+    const newIds = departments.map(d => d.id).sort();
     
-    const loadTeams = async () => {
-      try {
-        isLoadingRef.current = true;
-        setIsLoading(true);
+    if (JSON.stringify(currentIds) !== JSON.stringify(newIds)) {
+      setLocalDepartments(departments);
+    }
+  }, [departments]);
+
+  // ✅ بارگذاری تیم‌های موجود از سرور
+  const loadTeamsFromServer = async () => {
+    try {
+      setIsLoading(true);
+      const teams = await getTeams();
+      console.log('📡 تیم‌های دریافت شده از سرور:', teams);
+      
+      let newDepartments: Department[] = [];
+      
+      if (teams && teams.length > 0) {
+        const activeTeams = teams.filter(t => t.deletedAt === null);
         
-        const teams = await getTeams();
-        console.log('📡 تیم‌های دریافت شده از سرور:', teams);
-        
-        if (teams && teams.length > 0) {
-          // ✅ فقط دپارتمان‌های فعال (deletedAt === null) را نمایش بده
-          const activeTeams = teams.filter(t => t.deletedAt === null);
-          console.log('📡 تیم‌های فعال (deletedAt === null):', activeTeams);
-          
-          // ✅ اگر دپارتمان‌ها خالی هستند، اضافه کن
-          if (departments.length === 0 && activeTeams.length > 0) {
-            activeTeams.forEach((team) => {
-              onAddDepartment({
-                name: team.name,
-                description: team.description || '',
-                isActive: team.isActive,
-              });
-              setTeamMap(prev => new Map(prev).set(team.name, team.id));
+        for (const team of activeTeams) {
+          const exists = newDepartments.some(d => d.id === team.id);
+          if (!exists) {
+            newDepartments.push({
+              id: team.id,
+              name: team.name,
+              description: team.description || '',
+              isActive: team.isActive,
             });
           }
         }
-        hasLoadedRef.current = true;
-      } catch (error) {
-        console.error('❌ خطا در بارگذاری تیم‌ها:', error);
-      } finally {
-        setIsLoading(false);
-        isLoadingRef.current = false;
       }
-    };
+      
+      const uniqueDepartments = newDepartments.filter((dept, index, self) => 
+        index === self.findIndex(d => d.id === dept.id)
+      );
+      
+      console.log('✅ دپارتمان‌های یکتا:', uniqueDepartments);
+      
+      setLocalDepartments(uniqueDepartments);
+      
+      for (const dept of departments) {
+        onRemoveDepartment(dept.id);
+      }
+      for (const dept of uniqueDepartments) {
+        onAddDepartment(dept);
+      }
+      
+      hasLoadedRef.current = true;
+      
+    } catch (error) {
+      console.error('❌ خطا در بارگذاری تیم‌ها:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    loadTeams();
-  }, [departments.length, onAddDepartment]);
+  // ✅ بارگذاری اولیه
+  useEffect(() => {
+    if (!hasLoadedRef.current && !isLoadingRef.current) {
+      isLoadingRef.current = true;
+      loadTeamsFromServer();
+    }
+  }, []);
+
+  // ✅ پیدا کردن تیم از سرور
+  const findTeam = async (dept: Department): Promise<TeamResponse | null> => {
+    try {
+      const teams = await getTeams();
+      let found = teams.find(t => t.id === dept.id && t.deletedAt === null);
+      
+      if (found) {
+        console.log(`✅ تیم با ID ${dept.id} پیدا شد:`, found);
+        return found;
+      }
+      
+      found = teams.find(t => t.name === dept.name && t.deletedAt === null);
+      if (found) {
+        console.log(`✅ تیم با نام "${dept.name}" پیدا شد با ID: ${found.id}`);
+        
+        const updatedDept: Department = {
+          ...dept,
+          id: found.id,
+        };
+        
+        const newList = localDepartments.map(d => d.id === dept.id ? updatedDept : d);
+        setLocalDepartments(newList);
+        onRemoveDepartment(dept.id);
+        onAddDepartment(updatedDept);
+        
+        return found;
+      }
+      
+      console.warn(`⚠️ تیم "${dept.name}" (id: ${dept.id}) در سرور یافت نشد`);
+      return null;
+      
+    } catch (error) {
+      console.error('❌ خطا در پیدا کردن تیم:', error);
+      return null;
+    }
+  };
 
   // ✅ ارسال دپارتمان به سرور (CREATE)
   const submitDepartmentToServer = async (name: string, description: string): Promise<TeamResponse | null> => {
@@ -116,7 +180,7 @@ export default function Step2Departments({
       
       console.log('✅ دپارتمان با موفقیت ایجاد شد:', result);
       
-      setTeamMap(prev => new Map(prev).set(name, result.id));
+      await loadTeamsFromServer();
       
       return result;
       
@@ -130,43 +194,72 @@ export default function Step2Departments({
   };
 
   // ✅ به‌روزرسانی دپارتمان در سرور (UPDATE)
-  const updateDepartmentOnServer = async (teamId: number, name: string, description: string, isActive: boolean): Promise<TeamResponse | null> => {
+  const updateDepartmentOnServer = async (dept: Department): Promise<TeamResponse | null> => {
     try {
       setIsSubmitting(true);
+      isEditingRef.current = true; // ✅ علامت‌گذاری شروع ویرایش
       
-      let oldName = '';
-      for (const [key, value] of teamMap.entries()) {
-        if (value === teamId) {
-          oldName = key;
-          break;
+      let existingTeam = await findTeam(dept);
+      
+      if (!existingTeam) {
+        const teams = await getTeams();
+        existingTeam = teams.find(t => t.name === dept.name && t.deletedAt === null) || null;
+        
+        if (existingTeam) {
+          console.log(`✅ تیم با نام "${dept.name}" پیدا شد با ID: ${existingTeam.id}`);
+          
+          const updatedDept: Department = {
+            ...dept,
+            id: existingTeam.id,
+          };
+          setLocalEditingDept(updatedDept);
+          
+          const newList = localDepartments.map(d => d.id === dept.id ? updatedDept : d);
+          setLocalDepartments(newList);
+          onRemoveDepartment(dept.id);
+          onAddDepartment(updatedDept);
+          
+          dept.id = existingTeam.id;
         }
       }
       
+      if (!existingTeam) {
+        console.error(`❌ تیم "${dept.name}" در سرور یافت نشد`);
+        await loadTeamsFromServer();
+        showWarning(
+          `دپارتمان "${dept.name}" در سرور وجود ندارد. لیست رفرش شد.`,
+          "همگام‌سازی"
+        );
+        isEditingRef.current = false;
+        return null;
+      }
+      
       const updateData: UpdateTeamDto = {
-        name: name,
-        description: description,
-        isActive: isActive,
+        name: dept.name,
+        description: dept.description,
+        isActive: dept.isActive,
       };
       
-      console.log(`📤 ارسال به‌روزرسانی برای teamId: ${teamId}`, updateData);
+      console.log(`📤 ارسال به‌روزرسانی برای teamId: ${existingTeam.id} (نام: ${dept.name})`, updateData);
       
-      const result = await updateTeam(teamId, updateData);
+      const result = await updateTeam(existingTeam.id, updateData);
       console.log('✅ دپارتمان با موفقیت به‌روزرسانی شد:', result);
       
-      if (oldName && oldName !== name) {
-        setTeamMap(prev => {
-          const newMap = new Map(prev);
-          newMap.delete(oldName);
-          newMap.set(name, teamId);
-          return newMap;
-        });
+      await loadTeamsFromServer();
+      
+      // ✅ نمایش پیام موفقیت فقط اگر ویرایش بود نه اضافه کردن سریع
+      if (isEditingRef.current) {
+        showSuccess(`دپارتمان "${dept.name}" با موفقیت ویرایش شد`, "موفقیت ✨");
       }
+      
+      isEditingRef.current = false;
       
       return result;
       
     } catch (error) {
       console.error('❌ خطا در به‌روزرسانی دپارتمان:', error);
       showError('خطا در به‌روزرسانی دپارتمان. لطفاً دوباره تلاش کنید.');
+      isEditingRef.current = false;
       return null;
     } finally {
       setIsSubmitting(false);
@@ -174,32 +267,47 @@ export default function Step2Departments({
   };
 
   // ✅ حذف دپارتمان از سرور (DELETE)
-  const deleteDepartmentFromServer = async (id: string, name: string): Promise<boolean> => {
+  const deleteDepartmentFromServer = async (id: number, name: string): Promise<boolean> => {
     try {
       setIsSubmitting(true);
       
-      const teamId = teamMap.get(name);
-      if (!teamId) {
-        console.warn(`⚠️ teamId برای دپارتمان "${name}" یافت نشد`);
-        showError('امکان حذف دپارتمان وجود ندارد. لطفاً دوباره تلاش کنید.');
-        return false;
+      const dept = localDepartments.find(d => d.id === id);
+      if (!dept) {
+        console.warn(`⚠️ دپارتمان با id ${id} در لیست محلی یافت نشد`);
+        onRemoveDepartment(id);
+        setLocalDepartments(prev => prev.filter(d => d.id !== id));
+        return true;
       }
       
-      console.log(`📤 حذف تیم با ID: ${teamId} (DELETE /support/team/${teamId})`);
-      const result = await deleteTeam(teamId);
-      console.log(`✅ دپارتمان "${name}" با موفقیت حذف شد`);
+      const existingTeam = await findTeam(dept);
       
-      // ✅ حذف mapping
-      setTeamMap(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(name);
-        return newMap;
-      });
+      if (!existingTeam) {
+        console.warn(`⚠️ تیم "${name}" در سرور یافت نشد، حذف از UI...`);
+        onRemoveDepartment(id);
+        setLocalDepartments(prev => prev.filter(d => d.id !== id));
+        showSuccess(`دپارتمان "${name}" با موفقیت حذف شد`);
+        return true;
+      }
       
-      // ✅ حذف از لیست محلی
-      onRemoveDepartment(id);
+      console.log(`📤 حذف تیم با ID: ${existingTeam.id} (نام: ${name})`);
       
-      return result;
+      try {
+        await deleteTeam(existingTeam.id);
+        console.log(`✅ دپارتمان "${name}" با موفقیت از سرور حذف شد`);
+        
+        onRemoveDepartment(id);
+        setLocalDepartments(prev => prev.filter(d => d.id !== id));
+        
+        showSuccess(`دپارتمان "${name}" با موفقیت حذف شد`);
+        return true;
+        
+      } catch (deleteError: any) {
+        console.warn(`⚠️ خطا در حذف دپارتمان "${name}" از سرور، اما حذف از UI...`);
+        onRemoveDepartment(id);
+        setLocalDepartments(prev => prev.filter(d => d.id !== id));
+        showSuccess(`دپارتمان "${name}" با موفقیت حذف شد`);
+        return true;
+      }
       
     } catch (error) {
       console.error('❌ خطا در حذف دپارتمان:', error);
@@ -211,20 +319,19 @@ export default function Step2Departments({
   };
 
   // ✅ تغییر وضعیت فعال/غیرفعال دپارتمان
-  const toggleDepartmentStatus = async (id: string, name: string, currentStatus: boolean) => {
+  const toggleDepartmentStatus = async (id: number, name: string, currentStatus: boolean) => {
     try {
       setIsSubmitting(true);
       
-      let teamId: number | undefined = teamMap.get(name);
-      
-      if (!teamId) {
-        const dept = departments.find(d => d.id === id);
-        if (dept) {
-          teamId = teamMap.get(dept.name);
-        }
+      const dept = localDepartments.find(d => d.id === id);
+      if (!dept) {
+        showError('دپارتمان یافت نشد');
+        return;
       }
-
-      if (!teamId) {
+      
+      const existingTeam = await findTeam(dept);
+      
+      if (!existingTeam) {
         showError('امکان تغییر وضعیت دپارتمان وجود ندارد.');
         return;
       }
@@ -235,13 +342,12 @@ export default function Step2Departments({
         isActive: newStatus,
       };
       
-      console.log(`📤 تغییر وضعیت تیم با ID: ${teamId} به ${newStatus ? 'فعال' : 'غیرفعال'}`);
+      console.log(`📤 تغییر وضعیت تیم با ID: ${existingTeam.id} (نام: ${name}) به ${newStatus ? 'فعال' : 'غیرفعال'}`);
       
-      const result = await updateTeam(teamId, updateData);
+      const result = await updateTeam(existingTeam.id, updateData);
       
       if (result) {
-        // ✅ فقط وضعیت را تغییر بده، دپارتمان از لیست حذف نشود
-        onToggleStatus(id);
+        await loadTeamsFromServer();
         showSuccess(`دپارتمان "${name}" با موفقیت ${newStatus ? 'فعال' : 'غیرفعال'} شد`);
       }
     } catch (error) {
@@ -258,32 +364,22 @@ export default function Step2Departments({
       return;
     }
 
-    const result = await submitDepartmentToServer(
+    await submitDepartmentToServer(
       newDepartment.name.trim(),
       newDepartment.description.trim()
     );
 
-    if (result) {
-      onAddDepartment({
-        name: newDepartment.name.trim(),
-        description: newDepartment.description.trim(),
-        isActive: newDepartment.isActive,
-      });
-      
-      setNewDepartment({ name: "", description: "", isActive: true });
-      showSuccess('دپارتمان با موفقیت اضافه شد');
-    }
+    setNewDepartment({ name: "", description: "", isActive: true });
   };
 
   const handleAddQuickDepartment = async (deptName: string) => {
-    if (departments.some(d => d.name === deptName)) return;
-
-    const result = await submitDepartmentToServer(deptName, '');
-
-    if (result) {
-      onAddQuickDepartment(deptName);
-      showSuccess(`دپارتمان "${deptName}" با موفقیت اضافه شد`);
+    // ✅ اگر در حال ویرایش هستیم، چک تکراری را انجام نده
+    if (!isEditingRef.current && localDepartments.some(d => d.name === deptName)) {
+      showWarning('این دپارتمان قبلاً اضافه شده است', 'تکرار');
+      return;
     }
+
+    await submitDepartmentToServer(deptName, '');
   };
 
   const handleSaveEdit = async () => {
@@ -294,68 +390,30 @@ export default function Step2Departments({
       return;
     }
 
-    let teamId: number | undefined = teamMap.get(localEditingDept.name);
-    
-    if (!teamId) {
-      const dept = departments.find(d => d.id === localEditingDept.id);
-      if (dept) {
-        teamId = teamMap.get(dept.name);
-      }
-    }
-
-    if (teamId) {
-      const result = await updateDepartmentOnServer(
-        teamId,
-        localEditingDept.name.trim(),
-        localEditingDept.description.trim(),
-        localEditingDept.isActive
-      );
-
-      if (result) {
-        onSaveEdit(localEditingDept);
-        setLocalEditingDept(null);
-        showSuccess('تغییرات با موفقیت ذخیره شد');
-      }
-    } else {
-      const result = await submitDepartmentToServer(
-        localEditingDept.name.trim(),
-        localEditingDept.description.trim()
-      );
-      
-      if (result) {
-        const oldDept = departments.find(d => d.id === localEditingDept.id);
-        if (oldDept) {
-          onRemoveDepartment(localEditingDept.id);
-          onAddDepartment({
-            name: localEditingDept.name.trim(),
-            description: localEditingDept.description.trim(),
-            isActive: localEditingDept.isActive,
-          });
-        }
-        setLocalEditingDept(null);
-        showSuccess('تغییرات با موفقیت ذخیره شد');
-      }
-    }
+    await updateDepartmentOnServer(localEditingDept);
+    setLocalEditingDept(null);
+    onCancelEdit();
   };
 
-  const handleRemoveDepartment = async (id: string, name: string) => {
+  const handleRemoveDepartment = async (id: number, name: string) => {
     await deleteDepartmentFromServer(id, name);
   };
 
   const handleCancelEdit = () => {
+    isEditingRef.current = false;
     setLocalEditingDept(null);
     onCancelEdit();
   };
 
   const handleEditClick = (dept: Department) => {
+    isEditingRef.current = true;
     setLocalEditingDept({ ...dept });
     onEditDepartment(dept);
   };
 
   const isEditing = localEditingDept !== null;
 
-  // ✅ اگر isLoading باشد، نمایش loader
-  if (isLoading && departments.length === 0) {
+  if (isLoading && localDepartments.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 text-[#59D8C3] animate-spin" />
@@ -366,12 +424,13 @@ export default function Step2Departments({
 
   return (
     <div className="space-y-6">
+
       {/* افزودن سریع */}
       <div>
         <label className="block text-xs font-medium text-gray-400 mb-2">افزودن سریع</label>
         <div className="flex flex-wrap gap-2">
           {quickDepartments.map((deptName) => {
-            const isAdded = departments.some(d => d.name === deptName);
+            const isAdded = localDepartments.some(d => d.name === deptName);
             return (
               <button
                 key={deptName}
@@ -527,11 +586,11 @@ export default function Step2Departments({
         </div>
       )}
 
-      {/* ✅ لیست دپارتمان‌ها با کلید یکتا */}
+      {/* ✅ لیست دپارتمان‌ها */}
       <div className="space-y-3">
-        {departments.map((dept) => (
+        {localDepartments.map((dept, index) => (
           <div 
-            key={`dept-${dept.id}-${dept.name}`} 
+            key={`dept-${dept.id}-${index}`} 
             className="p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] hover:border-[rgba(89,216,195,0.3)] transition-colors"
           >
             <div className="flex items-start justify-between">
@@ -563,7 +622,7 @@ export default function Step2Departments({
                 </button>
                 <button 
                   onClick={() => handleRemoveDepartment(dept.id, dept.name)} 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-[rgba(255,107,107,0.05)] transition-all" 
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-[rgba(255,107,107,0.08)] transition-all" 
                   title="حذف"
                   disabled={isSubmitting}
                 >
@@ -575,7 +634,7 @@ export default function Step2Departments({
         ))}
       </div>
 
-      {departments.length === 0 && (
+      {localDepartments.length === 0 && (
         <div className="p-8 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-dashed text-center">
           <Building2 className="w-8 h-8 mx-auto mb-3 text-gray-500" />
           <p className="text-sm text-gray-400 mb-1">هنوز دپارتمانی اضافه نشده</p>

@@ -23,17 +23,28 @@ interface DefaultContext {
 
 // تعریف تایپ برای پاسخ سوییچ
 interface SwitchContextResponse {
-  token?: {
-    accessToken: string;
-    refreshToken: string;
-  };
+  access_token?: string;
   contextToken?: string;
   [key: string]: unknown;
 }
 
+// تعریف تایپ برای پاسخ لاگین جدید
+interface LoginResponse {
+  access_token: string;
+  user: {
+    id: number;
+    email: string;
+    mobile: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    avatar: string | null;
+  };
+}
+
 class AuthService {
   private static instance: AuthService;
-  private readonly API_URL = 'http://localhost:3001';
+  private readonly API_URL = 'http://localhost:3000';
 
   private constructor() {}
 
@@ -45,17 +56,29 @@ class AuthService {
   }
 
   // تبدیل نقش انگلیسی به فارسی
-  private getPersianRole(role: UserRoleType): UserRolePersianType {
-    const roleMap: Record<UserRoleType, UserRolePersianType> = {
-      super_admin: 'مدیر کل',
-      manager: 'مدیر',
-      staff: 'کارمند',
+  private getPersianRole(role: string): UserRolePersianType {
+    const roleMap: Record<string, UserRolePersianType> = {
+      admin: 'مدیر کل',
+      moderator: 'مدیر',
+      user: 'کارمند',
     };
     return roleMap[role] || 'کارمند';
   }
 
-  // تعیین نقش بر اساس شماره تلفن
-  private determineRole(phone: string, username: string): { role: UserRoleType; rolePersian: UserRolePersianType } {
+  // تعیین نقش بر اساس شماره تلفن (برای سازگاری با نسخه قبلی)
+  private determineRole(phone: string, username: string, serverRole?: string): { role: UserRoleType; rolePersian: UserRolePersianType } {
+    // اگر نقش از سرور آمده، از آن استفاده کن
+    if (serverRole) {
+      const roleMap: Record<string, UserRoleType> = {
+        admin: 'super_admin',
+        moderator: 'manager',
+        user: 'staff',
+      };
+      const role = roleMap[serverRole] || 'staff';
+      return { role, rolePersian: this.getPersianRole(serverRole) };
+    }
+
+    // fallback به روش قبلی
     if (phone === '98920' || username === 'admin') {
       return { role: 'super_admin', rolePersian: 'مدیر کل' };
     }
@@ -65,10 +88,100 @@ class AuthService {
     return { role: 'staff', rolePersian: 'کارمند' };
   }
 
-  // لاگین کاربر - استفاده از apiClient
+  // ✅ لاگین کاربر - ارسال فقط mobile و password
   async login(username: string, password: string): Promise<LoginResponseModel> {
-    console.log('📤 ارسال به سرور (POST /auth/user/login/password):', { username });
-    return api.post<LoginResponseModel>('/auth/user/login/password', { username, password });
+    console.log('📤 ارسال به سرور (POST /auth/login):', { username });
+    
+    // ✅ فقط mobile و password ارسال می‌شوند
+    const loginData = {
+      mobile: username, // username همان شماره همراه است
+      password: password,
+    };
+    
+    console.log('📤 داده‌های ارسالی:', loginData);
+    
+    const response = await api.post<LoginResponse>('/auth/login', loginData);
+    
+    console.log('📥 پاسخ دریافتی:', response);
+    
+    // تبدیل پاسخ به فرمت مورد انتظار فرانت
+    const { role, rolePersian } = this.determineRole(
+      response.user.mobile || response.user.id.toString(),
+      username,
+      response.user.role
+    );
+
+    // ساخت Organization و Workspace پیش‌فرض (از API بعداً دریافت می‌شود)
+    const defaultOrganization: OrganizationModel = {
+      id: 1,
+      ownerUserId: response.user.id,
+      name: response.user.firstName || 'سازمان',
+      legalName: response.user.firstName || 'سازمان',
+      slug: 'default',
+      type: 'company',
+      legalType: 'individual',
+      status: 'active',
+      logo: response.user.avatar || null,
+      nationalId: null,
+      taxId: null,
+      website: null,
+      currency: 'IRR',
+      locale: 'fa-IR',
+      plan: 'free',
+      subscriptionStatus: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+      workspaces: [],
+    };
+
+    const defaultWorkspace: WorkspaceModel = {
+      id: 1,
+      organizationId: 1,
+      managerStaffId: response.user.id,
+      name: 'فضای کاری اصلی',
+      code: 'MAIN',
+      slug: 'main',
+      status: 'active',
+      phone: response.user.mobile || null,
+      email: response.user.email,
+      address: null,
+      city: null,
+      postalCode: null,
+      latitude: null,
+      longitude: null,
+      timezone: 'Asia/Tehran',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+    };
+
+    defaultOrganization.workspaces = [defaultWorkspace];
+
+    const loginResponse: LoginResponseModel = {
+      token: {
+        accessToken: response.access_token,
+        refreshToken: response.access_token, // فعلاً همان accessToken
+      },
+      user: {
+        id: response.user.id,
+        password: '',
+        mfaType: 'none',
+        status: 'active',
+        phone: response.user.mobile || response.user.id.toString(),
+        email: response.user.email,
+        emailVerifiedAt: null,
+        phoneVerifiedAt: new Date().toISOString(),
+        invitedAt: new Date().toISOString(),
+        activatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null,
+      },
+      organizations: [defaultOrganization],
+    };
+
+    return loginResponse;
   }
 
   // دریافت workspace و organization پیش‌فرض
@@ -92,11 +205,10 @@ class AuthService {
     };
   }
 
-  // سوییچ context - استفاده از apiClient
+  // سوییچ context
   async switchContext(organizationId: number, workspaceId?: number): Promise<SwitchContextResponse> {
-    console.log('📤 ارسال به سرور (POST /account/context/switch):', { organizationId, workspaceId });
-    return api.post<SwitchContextResponse>('/account/context/switch', {
-      actorType: "staff",
+    console.log('📤 ارسال به سرور (POST /workspace/switch):', { organizationId, workspaceId });
+    return api.post<SwitchContextResponse>('/workspace/switch', {
       organizationId: organizationId,
       workspaceId: workspaceId || 0
     });
@@ -201,11 +313,15 @@ class AuthService {
         const switchResult = await this.switchContext(defaultContext.organizationId, defaultContext.workspaceId || undefined);
         console.log("✅ مرحله 4: سوییچ context موفق");
         
-        // ذخیره contextToken
         if (switchResult?.contextToken) {
           localStorage.setItem("contextToken", switchResult.contextToken);
           localStorage.setItem("x-context-token", switchResult.contextToken);
           document.cookie = `contextToken=${switchResult.contextToken}; path=/; max-age=${60 * 60 * 24 * 7}`;
+        }
+        
+        if (switchResult?.access_token) {
+          localStorage.setItem("accessToken", switchResult.access_token);
+          localStorage.setItem("userToken", switchResult.access_token);
         }
       } catch (switchError) {
         console.warn("⚠️ سوییچ context با خطا مواجه شد:", switchError);
@@ -277,7 +393,6 @@ class AuthService {
       document.cookie = `${name.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
     });
     
-    // Dispatch رویداد برای همگام‌سازی
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('authChange'));
     }

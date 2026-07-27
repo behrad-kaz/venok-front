@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@/services/api-client";
 
 // تعریف تایپ برای خطا
 interface ApiError {
@@ -17,14 +18,24 @@ interface ApiError {
 // تعریف تایپ برای پاسخ سوییچ
 interface SwitchResponse {
   contextToken: string;
+  access_token?: string;
 }
 
-// تعریف تایپ برای پاسخ سوییچ با توکن (در صورت وجود)
-interface SwitchResponseWithToken extends SwitchResponse {
-  token?: {
-    accessToken: string;
-    refreshToken: string;
-  };
+// تعریف تایپ برای پاسخ organization
+interface OrganizationResponse {
+  id: number;
+  name: string;
+  slug: string;
+  workspaces?: WorkspaceResponse[];
+}
+
+// تعریف تایپ برای workspace
+interface WorkspaceResponse {
+  id: number;
+  name: string;
+  slug: string;
+  code: string;
+  status: string;
 }
 
 export default function OnboardingSuccessPage() {
@@ -50,57 +61,73 @@ export default function OnboardingSuccessPage() {
     const handleSwitchAndRedirect = async () => {
       try {
         const accessToken = localStorage.getItem("accessToken");
-        const organizationsStr = localStorage.getItem("organizations");
+        const userStr = localStorage.getItem("user");
         
         if (!accessToken) {
           throw new Error("توکن معتبر یافت نشد");
         }
         
-        if (!organizationsStr) {
-          throw new Error("اطلاعات سازمان یافت نشد");
+        // ✅ بررسی organizationId از user ذخیره شده در localStorage
+        let userOrganizationId: number | null = null;
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr);
+            userOrganizationId = user.organizationId || null;
+            console.log("📡 organizationId از user:", userOrganizationId);
+          } catch (e) {
+            console.warn("⚠️ خطا در parse user:", e);
+          }
         }
         
-        const organizations = JSON.parse(organizationsStr);
-        const defaultOrganization = organizations[0];
-        const defaultWorkspace = defaultOrganization?.workspaces?.[0];
+        // ✅ مرحله 1: دریافت سازمان کاربر (بدون ایجاد)
+        console.log("📡 دریافت سازمان کاربر...");
+        let organization: OrganizationResponse | null = null;
         
-        const organizationId = defaultOrganization?.id;
-        const workspaceId = defaultWorkspace?.id;
+        try {
+          organization = await api.get<OrganizationResponse>('/organization/by-user');
+          console.log("✅ سازمان دریافت شد:", organization);
+        } catch (orgError) {
+          console.error("❌ سازمانی برای این کاربر یافت نشد!");
+          throw new Error("سازمانی برای این کاربر یافت نشد. لطفاً با ادمین اصلی تماس بگیرید.");
+        }
         
-        console.log("📡 اطلاعات پیش‌فرض:", {
-          organizationId,
-          workspaceId,
-          hasWorkspace: !!defaultWorkspace
+        // ✅ اگر سازمان وجود نداشت، خطا بده
+        if (!organization) {
+          throw new Error("سازمانی برای این کاربر یافت نشد. لطفاً با ادمین اصلی تماس بگیرید.");
+        }
+        
+        // ذخیره organization در localStorage
+        localStorage.setItem("currentOrganization", JSON.stringify(organization));
+        localStorage.setItem("currentOrganizationId", String(organization.id));
+        
+        // ✅ مرحله 2: بررسی وجود workspace
+        const workspaces = organization?.workspaces || [];
+        const hasWorkspace = workspaces.length > 0;
+        const defaultWorkspace = hasWorkspace ? workspaces[0] : null;
+        
+        console.log("📡 بررسی workspace:", {
+          hasWorkspace,
+          workspaceCount: workspaces.length,
+          defaultWorkspace
         });
         
+        // ✅ مرحله 3: سوییچ context (فقط اگر workspace وجود داشته باشد)
         let contextToken: string | null = null;
         
-        // تنظیم هدر Authorization برای درخواست سوییچ
-        try {
-          const switchResponse = await fetch("http://localhost:3001/account/context/switch", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${accessToken}`
-            },
-            body: JSON.stringify({
-              actorType: "staff",
-              organizationId: organizationId,
-              workspaceId: workspaceId || 0
-            }),
-          });
-          
-          if (switchResponse.ok || switchResponse.status === 200 || switchResponse.status === 201) {
-            const switchData = await switchResponse.json() as SwitchResponseWithToken;
-            console.log("✅ سوییچ موفق:", switchData);
+        if (hasWorkspace && defaultWorkspace) {
+          try {
+            const switchResponse = await api.post<SwitchResponse>('/workspace/switch', {
+              organizationId: organization.id,
+              workspaceId: defaultWorkspace.id
+            });
             
-            // ذخیره contextToken
-            if (switchData?.contextToken) {
-              contextToken = switchData.contextToken;
+            console.log("✅ سوییچ موفق:", switchResponse);
+            
+            if (switchResponse?.contextToken) {
+              contextToken = switchResponse.contextToken;
               localStorage.setItem("contextToken", contextToken);
               localStorage.setItem("x-context-token", contextToken);
               
-              // ذخیره در کوکی برای middleware
               const maxAge = 60 * 60 * 24 * 7;
               document.cookie = `contextToken=${contextToken}; path=/; max-age=${maxAge}`;
               document.cookie = `x-context-token=${contextToken}; path=/; max-age=${maxAge}`;
@@ -108,27 +135,26 @@ export default function OnboardingSuccessPage() {
               console.log("✅ contextToken ذخیره شد:", contextToken);
             }
             
-            // به‌روزرسانی توکن در صورت وجود
-            if (switchData?.token) {
-              localStorage.setItem("accessToken", switchData.token.accessToken);
-              localStorage.setItem("refreshToken", switchData.token.refreshToken);
+            if (switchResponse?.access_token) {
+              localStorage.setItem("accessToken", switchResponse.access_token);
+              localStorage.setItem("userToken", switchResponse.access_token);
               console.log("✅ توکن به‌روزرسانی شد");
             }
-          } else {
-            console.warn("⚠️ سوییچ با خطا مواجه شد، اما ادامه می‌دهیم");
+          } catch (switchError) {
+            console.warn("⚠️ خطا در سوییچ، اما ادامه می‌دهیم:", switchError);
           }
-        } catch (switchError) {
-          console.warn("⚠️ خطا در سوییچ، اما ادامه می‌دهیم:", switchError);
         }
         
-        localStorage.setItem("currentOrganizationId", String(organizationId));
-        if (workspaceId) {
-          localStorage.setItem("currentWorkspaceId", String(workspaceId));
+        // ✅ ذخیره workspace در localStorage
+        if (defaultWorkspace) {
+          localStorage.setItem("currentWorkspace", JSON.stringify(defaultWorkspace));
+          localStorage.setItem("currentWorkspaceId", String(defaultWorkspace.id));
         }
         
+        // ✅ تعیین مسیر هدف بر اساس وجود workspace
         let targetPath = "/dashboard";
         
-        if (!defaultWorkspace) {
+        if (!hasWorkspace) {
           targetPath = "/onboarding/workspace";
           console.log("🚀 بدون workspace → رفتن به صفحه راه‌اندازی");
         } else {
@@ -193,7 +219,8 @@ export default function OnboardingSuccessPage() {
       "isLoggedIn", "userRole", "hasSeenOnboarding", "userRoleEnglish",
       "userName", "userToken", "refreshToken", "userId", "userPhone",
       "accessToken", "organizations", "currentOrganizationId", "currentWorkspaceId",
-      "loginUsername", "loginPassword", "contextToken", "x-context-token"
+      "loginUsername", "loginPassword", "contextToken", "x-context-token",
+      "user"
     ];
     
     keysToRemove.forEach(key => localStorage.removeItem(key));

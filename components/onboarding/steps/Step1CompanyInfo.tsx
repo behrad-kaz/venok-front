@@ -2,7 +2,7 @@
 'use client';
 
 import { useRef, forwardRef, useImperativeHandle, useState, useEffect } from 'react';
-import { MessageCircle, Image, Phone, Mail, Loader2, Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import { MessageCircle, Image as ImageIcon, Phone, Mail, Loader2, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { api } from '@/services/api-client';
 import { useModal } from '@/components/ui/modal';
@@ -11,7 +11,6 @@ export interface Step1CompanyInfoRef {
   handleSaveAll: () => Promise<void>;
 }
 
-// استفاده از object به جای interface خالی
 type Step1CompanyInfoProps = object;
 
 const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>((_, ref) => {
@@ -27,20 +26,14 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // ✅ state محلی برای tracking لوگو (برای جلوگیری از lost در re-render)
   const [localLogo, setLocalLogo] = useState<File | null>(null);
   const [localLogoPreview, setLocalLogoPreview] = useState<string | null>(null);
-  
-  // ✅ state برای تشخیص اینکه کاربر لوگوی جدید انتخاب کرده
   const [hasNewLogo, setHasNewLogo] = useState(false);
+  const [displayLogoUrl, setDisplayLogoUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   
-  // ✅ state برای بارگذاری اطلاعات workspace
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(false);
-  const [workspaceData, setWorkspaceData] = useState<{
-    name: string;
-    phone: string;
-    email: string;
-  } | null>(null);
 
   // ✅ بارگذاری اطلاعات workspace از API
   useEffect(() => {
@@ -60,22 +53,38 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
           name: string; 
           phone: string | null; 
           email: string | null;
+          logo?: string | null;
         }>(`/workspace/${workspaceId}`);
         
         console.log('📡 اطلاعات workspace دریافت شد:', data);
         
         if (data) {
-          setWorkspaceData({
-            name: data.name || '',
-            phone: data.phone || '',
-            email: data.email || '',
-          });
+          let logoUrl = data.logo || null;
           
-          // ✅ به‌روزرسانی companyInfo با مقادیر workspace
+          if (logoUrl && logoUrl.startsWith('/files/')) {
+            logoUrl = `http://localhost:3000${logoUrl}`;
+          }
+          
+          console.log('🖼️ آدرس لوگو نهایی:', logoUrl);
+          
+          setDisplayLogoUrl(logoUrl);
+          setImageError(false);
+          setImageLoading(true);
+          
+          if (logoUrl) {
+            localStorage.setItem("companyLogo", logoUrl);
+          }
+          
           setCompanyInfo({
             name: data.name || '',
             phone: data.phone || '',
             email: data.email || '',
+            logoUrl: logoUrl,
+            logo: logoUrl,
+            logoPreview: null,
+            logoId: null,
+            description: '',
+            domain: '',
           });
         }
       } catch (error) {
@@ -88,19 +97,8 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
     loadWorkspaceData();
   }, [setCompanyInfo]);
 
-  // ✅ وقتی لوگو از سرور آپلود شد، state جدید رو reset کن
-  useEffect(() => {
-    if (uploadStatus === 'success' && companyInfo.logoUrl) {
-      setHasNewLogo(false);
-      setLocalLogo(null);
-      setLocalLogoPreview(null);
-    }
-  }, [uploadStatus, companyInfo.logoUrl]);
-
-  // expose handleSaveAll به parent
   useImperativeHandle(ref, () => ({
     handleSaveAll: async () => {
-      // ✅ قبل از ذخیره، اطمینان از وجود لوگو در store
       if (localLogo) {
         console.log('📤 انتقال لوگو از state محلی به store:', localLogo.name);
         setCompanyInfo({
@@ -131,18 +129,20 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
       return;
     }
 
-    // ایجاد preview
     const reader = new FileReader();
     reader.onloadend = () => {
-      // ✅ ذخیره در state محلی
-      setLocalLogo(file);
-      setLocalLogoPreview(reader.result as string);
-      setHasNewLogo(true); // ✅ علامت‌گذاری که لوگوی جدید انتخاب شده
+      const previewUrl = reader.result as string;
       
-      // ✅ همچنین در store ذخیره کن برای نمایش (اما logoUrl اولویت نداره)
+      setLocalLogo(file);
+      setLocalLogoPreview(previewUrl);
+      setHasNewLogo(true);
+      setDisplayLogoUrl(previewUrl);
+      setImageError(false);
+      setImageLoading(false);
+      
       setCompanyInfo({
         logo: file,
-        logoPreview: reader.result as string,
+        logoPreview: previewUrl,
       });
       
       console.log('✅ لوگو انتخاب شد:', file.name, 'حجم:', file.size);
@@ -153,10 +153,13 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
   const isUploading = uploadStatus === 'uploading';
   const isUploadSuccess = uploadStatus === 'success';
   const isUploadError = uploadStatus === 'error';
-  
-  const getLogoUrl = () => {
+
+  const getLogoUrl = (): string | null => {
     if (hasNewLogo && localLogoPreview) {
       return localLogoPreview;
+    }
+    if (displayLogoUrl) {
+      return displayLogoUrl;
     }
     if (companyInfo.logoUrl) {
       return companyInfo.logoUrl;
@@ -164,15 +167,19 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
     if (companyInfo.logoPreview) {
       return companyInfo.logoPreview;
     }
-    if (localLogoPreview) {
-      return localLogoPreview;
-    }
     return null;
   };
 
   const logoUrl = getLogoUrl();
 
-  // ✅ اگر در حال بارگذاری هستیم، نمایش loader
+  useEffect(() => {
+    if (logoUrl && !hasNewLogo) {
+      setDisplayLogoUrl(logoUrl);
+      setImageError(false);
+      setImageLoading(true);
+    }
+  }, [logoUrl, hasNewLogo]);
+
   if (isLoadingWorkspace) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -211,10 +218,28 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
                   <Loader2 className="w-6 h-6 text-[#59D8C3] animate-spin" />
                   <span className="text-[10px] text-gray-500 mt-1">در حال آپلود...</span>
                 </div>
-              ) : logoUrl ? (
-                <img src={logoUrl} alt="logo" className="w-full h-full object-cover" />
+              ) : logoUrl && !imageError ? (
+                // ✅ استفاده از img معمولی با fetch priority
+                <img 
+                  key={logoUrl}
+                  src={logoUrl} 
+                  alt="logo" 
+                  className="w-full h-full object-cover"
+                  loading="eager"
+                  onError={(e) => {
+                    console.error('❌ خطا در بارگذاری لوگو:', logoUrl);
+                    setImageError(true);
+                    // مخفی کردن تصویر خطا
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                  onLoad={() => {
+                    console.log('✅ لوگو با موفقیت بارگذاری شد:', logoUrl);
+                    setImageError(false);
+                    setImageLoading(false);
+                  }}
+                />
               ) : (
-                <Image className="w-6 h-6 text-gray-500" />
+                <ImageIcon className="w-6 h-6 text-gray-500" />
               )}
               
               {isUploadSuccess && (
@@ -312,8 +337,23 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
           <div className="p-4 rounded-xl bg-[rgba(0,0,0,0.4)] border border-[rgba(255,255,255,0.1)]">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-[rgba(89,216,195,0.1)] border border-[#59D8C3] flex items-center justify-center overflow-hidden flex-shrink-0">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="logo" className="w-full h-full object-cover" />
+                {logoUrl && !imageError ? (
+                  <img 
+                    key={`preview-${logoUrl}`}
+                    src={logoUrl} 
+                    alt="logo" 
+                    className="w-full h-full object-cover"
+                    loading="eager"
+                    onError={(e) => {
+                      console.error('❌ خطا در بارگذاری لوگو (پیش‌نمایش):', logoUrl);
+                      setImageError(true);
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                    onLoad={() => {
+                      console.log('✅ لوگو در پیش‌نمایش با موفقیت بارگذاری شد:', logoUrl);
+                      setImageError(false);
+                    }}
+                  />
                 ) : (
                   <MessageCircle className="w-5 h-5 text-[#59D8C3]" />
                 )}
