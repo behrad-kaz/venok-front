@@ -2,34 +2,17 @@
 
 "use client";
 
-import { SecuritySettings, Session } from "./types";
-import { Monitor, Smartphone, Laptop, LogOut } from "lucide-react";
+import { SecuritySettings } from "./types";
+import { useState } from "react";
 
 interface WorkspaceSecurityTabProps {
   settings: SecuritySettings;
   onSettingsChange: (settings: SecuritySettings) => void;
-  sessions: Session[];
-  onLogoutAll: () => void;
-  onLogoutSession: (sessionId: string) => void;
 }
-
-const getDeviceIcon = (type: Session["deviceType"]) => {
-  switch (type) {
-    case "mobile":
-      return <Smartphone className="w-5 h-5" />;
-    case "tablet":
-      return <Smartphone className="w-5 h-5" />;
-    default:
-      return <Monitor className="w-5 h-5" />;
-  }
-};
 
 export default function WorkspaceSecurityTab({ 
   settings, 
-  onSettingsChange, 
-  sessions, 
-  onLogoutAll, 
-  onLogoutSession 
+  onSettingsChange 
 }: WorkspaceSecurityTabProps) {
   const toggleSetting = (key: keyof SecuritySettings) => {
     if (key === "autoLogoutMinutes") return;
@@ -42,7 +25,7 @@ export default function WorkspaceSecurityTab({
 
   return (
     <div className="p-6 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
-      <h3 className="text-base font-bold text-white mb-5">امنیت و نشست‌ها</h3>
+      <h3 className="text-base font-bold text-white mb-5">امنیت</h3>
       
       <div className="space-y-5">
         {/* تنظیمات امنیت */}
@@ -95,61 +78,6 @@ export default function WorkspaceSecurityTab({
               <option value="240" className="bg-[#0D1B17] text-white">۴ ساعت</option>
               <option value="0" className="bg-[#0D1B17] text-white">هیچ‌وقت</option>
             </select>
-          </div>
-        </div>
-
-        {/* نشست‌های فعال */}
-        <div className="pt-5 border-t border-[rgba(255,255,255,0.1)]">
-          <div className="flex items-center justify-between mt-2  mb-4">
-            <h4 className="text-sm font-medium text-white">نشست‌های فعال</h4>
-            <button
-              onClick={onLogoutAll}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[rgba(255,107,107,0.08)] text-red-400 border border-[rgba(255,107,107,0.15)] hover:bg-[rgba(255,107,107,0.12)] transition-all"
-            >
-              خروج از همه نشست‌ها
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {sessions.map((session) => (
-              <div
-                key={session.id}
-                className={`p-4 rounded-xl border transition-all ${
-                  session.isCurrent
-                    ? "bg-[rgba(89,216,195,0.08)] border-[rgba(89,216,195,0.15)]"
-                    : "bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)]"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="w-10 h-10 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] flex items-center justify-center flex-shrink-0 text-gray-500">
-                      {getDeviceIcon(session.deviceType)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-medium text-white">{session.device}</p>
-                        {session.isCurrent && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F]">
-                            نشست فعلی
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">{session.browser}</p>
-                      <p className="text-xs text-gray-500 mt-1">{session.location} • آخرین فعالیت: {session.lastActivity}</p>
-                    </div>
-                  </div>
-                  {!session.isCurrent && (
-                    <button
-                      onClick={() => onLogoutSession(session.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 hover:bg-[rgba(255,107,107,0.08)] transition-all flex-shrink-0 flex items-center gap-1"
-                    >
-                      <LogOut className="w-3 h-3" />
-                      خروج
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>

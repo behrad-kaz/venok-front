@@ -1,3 +1,4 @@
+// components/dashboard/workspace-settings/WorkspaceUnsavedAlert.tsx
 "use client";
 
 import { AlertCircle } from "lucide-react";
@@ -5,7 +6,7 @@ import { AlertCircle } from "lucide-react";
 interface WorkspaceUnsavedAlertProps {
   onSave: () => void;
   onCancel: () => void;
-  isSaving?: boolean; // ✅ اضافه شد
+  isSaving?: boolean;
 }
 
 export default function WorkspaceUnsavedAlert({ 
@@ -24,7 +25,8 @@ export default function WorkspaceUnsavedAlert({
       <div className="flex items-center gap-2">
         <button
           onClick={onCancel}
-          className="px-4 py-2 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.05)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all"
+          disabled={isSaving}
+          className="px-4 py-2 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.05)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           لغو تغییرات
         </button>

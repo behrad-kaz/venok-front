@@ -1,4 +1,6 @@
-// components/dashboard/members/types.ts
+// ============================================================
+// FILE: components/dashboard/members/types.ts
+// ============================================================
 export interface Member {
   id: number;
   firstName: string;
@@ -67,6 +69,15 @@ export interface StaffResponse {
   status: string;
   phone?: string;
   userId?: number;
+  departmentId?: number;
+  role?: string;
+  department?: {
+    id: number;
+    name: string;
+    color: string;
+  };
+  isActive: boolean;
+  lastOnlineAt?: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -78,3 +89,4 @@ export interface StatsData {
   activeMembersCount: number;
   inactiveMembersCount: number;
 }
+// ============================================================

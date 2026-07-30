@@ -1,9 +1,11 @@
-// hooks/useWidgetSettings.ts
+// ============================================================
+// FILE: hooks/useWidgetSettings.ts
+// ============================================================
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useModal } from '@/components/ui/modal';
 import { getCurrentWidgetConfig, updateWidgetConfig } from '@/services/widgetApi';
-import { WidgetConfig, WidgetFormData, Department } from '@/components/dashboard/widget/types';
+import { WidgetConfig, Department } from '@/components/dashboard/widget/types';
 
 const DEFAULT_CONFIG: WidgetConfig = {
   organizationId: 0,
@@ -30,61 +32,87 @@ const DEFAULT_CONFIG: WidgetConfig = {
 };
 
 export function useWidgetSettings() {
-  const { showSuccess, showError, showConfirm, showInfo } = useModal();
+  const { showSuccess, showError, showInfo, showConfirm } = useModal();
   
   const [config, setConfig] = useState<WidgetConfig>(DEFAULT_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [initialConfig, setInitialConfig] = useState<WidgetConfig | null>(null);
+  
+  // ✅ Ref برای جلوگیری از بارگذاری مجدد
+  const isLoadedRef = useRef(false);
+  const isLoadingRef = useRef(false);
 
-  // بارگذاری تنظیمات از API
+  // بارگذاری تنظیمات از API - با جلوگیری از درخواست‌های تکراری
   const loadConfig = useCallback(async () => {
+    // ✅ جلوگیری از درخواست‌های همزمان
+    if (isLoadingRef.current) {
+      console.log('⏳ درخواست قبلی در حال انجام است، صرف نظر...');
+      return;
+    }
+    
+    // ✅ جلوگیری از بارگذاری مجدد
+    if (isLoadedRef.current) {
+      console.log('✅ تنظیمات قبلاً بارگذاری شده است');
+      return;
+    }
+    
     try {
+      isLoadingRef.current = true;
       setIsLoading(true);
+      
+      console.log('📤 دریافت تنظیمات ویجت...');
       const data = await getCurrentWidgetConfig();
       
       const mappedConfig: WidgetConfig = {
-        organizationId: data.organizationId,
-        workspaceId: data.workspaceId,
-        widgetToken: data.widgetToken,
-        companyName: data.companyName,
-        logoUrl: data.logoUrl,
-        primaryColor: data.primaryColor,
-        buttonPosition: data.buttonPosition,
-        buttonSize: data.buttonSize,
-        formTitle: data.formTitle,
-        formDescription: data.formDescription,
-        phonePlaceholder: data.phonePlaceholder,
-        submitButtonText: data.submitButtonText,
-        successMessage: data.successMessage,
-        privacyText: data.privacyText,
-        showDepartmentSelect: data.showDepartmentSelect,
-        showDescriptionField: data.showDescriptionField,
-        descriptionRequired: data.descriptionRequired,
-        allowedDomains: data.allowedDomains,
-        isActive: data.isActive,
-        departments: data.departments,
-        supportTeamIds: data.departments.map(d => d.id),
+        organizationId: data.organizationId || 0,
+        workspaceId: data.workspaceId || 0,
+        widgetToken: data.widgetToken || '',
+        companyName: data.companyName || '',
+        logoUrl: data.logoUrl || null,
+        primaryColor: data.primaryColor || '#14b8a6',
+        buttonPosition: data.buttonPosition || 'bottom-right',
+        buttonSize: data.buttonSize || 'md',
+        formTitle: data.formTitle || 'چطور می‌تونیم کمکتون کنیم؟',
+        formDescription: data.formDescription || 'موضوع گفتگو را انتخاب کنید تا شما را به تیم مناسب وصل کنیم.',
+        phonePlaceholder: data.phonePlaceholder || 'شماره همراه خود را وارد کنید',
+        submitButtonText: data.submitButtonText || 'شروع گفتگو',
+        successMessage: data.successMessage || 'لینک گفتگو برای شما پیامک شد.',
+        privacyText: data.privacyText || 'با ثبت شماره، لینک گفتگو از طریق پیامک برای شما ارسال می‌شود.',
+        showDepartmentSelect: data.showDepartmentSelect !== undefined ? data.showDepartmentSelect : true,
+        showDescriptionField: data.showDescriptionField !== undefined ? data.showDescriptionField : true,
+        descriptionRequired: data.descriptionRequired || false,
+        allowedDomains: data.allowedDomains || [],
+        isActive: data.isActive !== undefined ? data.isActive : true,
+        departments: data.departments || [],
+        supportTeamIds: (data.departments || []).map(d => d.id),
       };
       
       setConfig(mappedConfig);
       setInitialConfig(mappedConfig);
       setHasChanges(false);
+      isLoadedRef.current = true;
       
-      console.log('✅ تنظیمات ویجت بارگذاری شد:', mappedConfig);
+      console.log('✅ تنظیمات ویجت بارگذاری شد');
       
     } catch (error) {
       console.error('❌ خطا در بارگذاری تنظیمات ویجت:', error);
-      showError('خطا در بارگذاری تنظیمات ویجت', 'خطا');
+      // ✅ نمایش خطا فقط یک بار
+      if (!isLoadedRef.current) {
+        showError('خطا در بارگذاری تنظیمات ویجت', 'خطا');
+      }
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   }, [showError]);
 
-  // بارگذاری اولیه
+  // ✅ بارگذاری اولیه فقط یک بار
   useEffect(() => {
-    loadConfig();
+    if (!isLoadedRef.current && !isLoadingRef.current) {
+      loadConfig();
+    }
   }, [loadConfig]);
 
   // بررسی تغییرات
@@ -174,10 +202,9 @@ export function useWidgetSettings() {
       
       const result = await updateWidgetConfig(updateData);
       
-      // به‌روزرسانی config با داده‌های جدید
       const updatedConfig: WidgetConfig = {
         ...config,
-        departments: result.departments,
+        departments: result.departments || [],
       };
       
       setConfig(updatedConfig);
@@ -237,8 +264,6 @@ export function useWidgetSettings() {
     const dept = config.departments.find(d => d.id === departmentId);
     if (!dept) return;
     
-    // فقط وضعیت را در لیست محلی تغییر می‌دهیم
-    // برای ارسال به سرور، باید supportTeamIds را به‌روز کنیم
     const updatedDepartments = config.departments.map(d =>
       d.id === departmentId ? { ...d, isActive: !d.isActive } : d
     );
@@ -266,3 +291,4 @@ export function useWidgetSettings() {
     toggleDepartmentStatus,
   };
 }
+// ============================================================

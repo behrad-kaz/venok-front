@@ -106,10 +106,34 @@ export const updateWorkspace = async (
   workspaceId: number | string,
   data: {
     name: string;
-    phone: string;
-    email: string;
     slug: string;
+    phone?: string;
+    email?: string;
     logo?: string;
+    supportPhone?: string;
+    supportEmail?: string;
+    alertPhone?: string;
+    introText?: string;
+    workingDays?: {
+      saturday: boolean;
+      sunday: boolean;
+      monday: boolean;
+      tuesday: boolean;
+      wednesday: boolean;
+      thursday: boolean;
+      friday: boolean;
+    };
+    workStartTime?: string;
+    workEndTime?: string;
+    outOfHoursMessage?: string;
+    sendLinkSms?: boolean;
+    sendOtpForPasswordChange?: boolean;
+    notifyManagerForUnanswered?: boolean;
+    notifyNewConversations?: boolean;
+    requireStrongPassword?: boolean;
+    requirePhoneVerificationForPasswordChange?: boolean;
+    autoLogoutMinutes?: number;
+    timezone?: string;
   },
   accessToken: string,
   contextToken?: string | null,
@@ -120,6 +144,22 @@ export const updateWorkspace = async (
     phone: data.phone || "",
     email: data.email || "",
     logo: data.logo || "",
+    supportPhone: data.supportPhone || "",
+    supportEmail: data.supportEmail || "",
+    alertPhone: data.alertPhone || "",
+    introText: data.introText || "",
+    workingDays: data.workingDays || {},
+    workStartTime: data.workStartTime || "09:00",
+    workEndTime: data.workEndTime || "18:00",
+    outOfHoursMessage: data.outOfHoursMessage || "",
+    sendLinkSms: data.sendLinkSms !== undefined ? data.sendLinkSms : true,
+    sendOtpForPasswordChange: data.sendOtpForPasswordChange !== undefined ? data.sendOtpForPasswordChange : true,
+    notifyManagerForUnanswered: data.notifyManagerForUnanswered !== undefined ? data.notifyManagerForUnanswered : true,
+    notifyNewConversations: data.notifyNewConversations !== undefined ? data.notifyNewConversations : true,
+    requireStrongPassword: data.requireStrongPassword !== undefined ? data.requireStrongPassword : true,
+    requirePhoneVerificationForPasswordChange: data.requirePhoneVerificationForPasswordChange !== undefined ? data.requirePhoneVerificationForPasswordChange : true,
+    autoLogoutMinutes: data.autoLogoutMinutes || 60,
+    timezone: data.timezone || "Asia/Tehran",
   };
 
   console.log(`📤 ارسال به سرور (PATCH /workspace/${workspaceId}):`, requestBody);

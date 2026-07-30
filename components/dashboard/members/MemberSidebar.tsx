@@ -1,4 +1,6 @@
-// components/dashboard/members/MemberSidebar.tsx
+// ============================================================
+// FILE: components/dashboard/members/MemberSidebar.tsx
+// ============================================================
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -53,7 +55,7 @@ export default function MemberSidebar({
       setDepartmentId(editingMember.departmentId || 0);
       setRole(editingMember.role || "کارمند");
       setStatus(editingMember.status || "active");
-      setPassword("");
+      setPassword(""); // ✅ در ویرایش، رمز عبور خالی می‌شود (اختیاری)
     } else {
       setFullName("");
       setPhone("");
@@ -111,6 +113,7 @@ export default function MemberSidebar({
       return;
     }
     
+    // ✅ در حالت افزودن، رمز عبور اجباری است
     if (!editingMember) {
       if (!password || password.length < 8) {
         showWarning("رمز عبور باید حداقل ۸ کاراکتر باشد", "خطا در رمز عبور");
@@ -118,6 +121,7 @@ export default function MemberSidebar({
       }
     }
     
+    // ✅ در حالت ویرایش، اگر رمز عبور وارد شده باشد، باید حداقل ۸ کاراکتر باشد
     if (editingMember && password && password.length < 8) {
       showWarning("رمز عبور باید حداقل ۸ کاراکتر باشد", "خطا در رمز عبور");
       return;
@@ -144,6 +148,8 @@ export default function MemberSidebar({
       status,
     };
     
+    // ✅ فقط در صورتی که رمز عبور وارد شده باشد، آن را ارسال کن
+    // (در حالت افزودن اجباری است، در حالت ویرایش اختیاری)
     if (password) {
       saveData.password = password;
     }
@@ -355,3 +361,4 @@ export default function MemberSidebar({
     </>
   );
 }
+// ============================================================

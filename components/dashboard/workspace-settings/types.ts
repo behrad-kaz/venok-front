@@ -1,5 +1,3 @@
-// components/dashboard/workspace-settings/types.ts
-
 export type WorkspaceTabType = 
   | "company" 
   | "support" 
@@ -10,19 +8,19 @@ export type WorkspaceTabType =
 
 export interface CompanyInfo {
   name: string;
-  domain: string;
-  description: string;
-  logo: string | null;
-  phone?: string;    
-  email?: string;      
+  domain: string; // از organization.website
+  description: string; // از organization.description
+  logo: string | null; // از organization.logo یا workspace.logo
+  phone?: string; // از workspace.phone
+  email?: string; // از workspace.email
   logoFile?: File | null; 
 }
 
 export interface SupportInfo {
-  phone: string;
-  email: string;
-  alertPhone: string;
-  introText: string;
+  phone: string; // از workspace.supportPhone
+  email: string; // از workspace.supportEmail
+  alertPhone: string; // از workspace.alertPhone
+  introText: string; // از workspace.introText
 }
 
 export interface WorkingHours {
@@ -35,8 +33,8 @@ export interface WorkingHours {
     thursday: boolean;
     friday: boolean;
   };
-  startTime: string;
-  endTime: string;
+  startTime: string; // workspace.workStartTime
+  endTime: string; // workspace.workEndTime
   timezone: string;
   outOfHoursMessage: string;
 }
@@ -59,14 +57,4 @@ export interface SetupItem {
   title: string;
   completed: boolean;
   action?: () => void;
-}
-
-export interface Session {
-  id: string;
-  device: string;
-  deviceType: "desktop" | "mobile" | "tablet";
-  browser: string;
-  location: string;
-  lastActivity: string;
-  isCurrent?: boolean;
 }

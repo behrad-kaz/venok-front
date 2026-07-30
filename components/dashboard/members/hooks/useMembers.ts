@@ -1,20 +1,20 @@
-// components/dashboard/members/hooks/useMembers.ts
+// ============================================================
+// FILE: components/dashboard/members/hooks/useMembers.ts
+// ============================================================
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Member, Department, StatsData, AgentResponse, TeamResponse } from "../types";
 import {
-  getHeadersWithRefresh,
   fetchTeams,
   fetchAgents,
   fetchStaff,
   getStaffCount,
   createStaff,
-  createAgent,
-  assignAgentToTeam,
+  updateStaff,
   updateAgent,
   deleteAgent,
   deleteStaff,
-  updateStaff,
-} from "../api/membersApi";
+  assignAgentToTeam,
+} from "@/services/membersApi";
 import { useModal } from "@/components/ui/modal";
 
 const mapAgentToMember = (
@@ -31,12 +31,11 @@ const mapAgentToMember = (
   const lastName = nameParts.slice(1).join(' ') || '';
   
   let departmentId = 0;
-  let departmentName = '';
+  let departmentName = 'بدون دپارتمان';
   let role: "مدیر دپارتمان" | "کارمند" = "کارمند";
   
   if (agent.supportAgentTeams && agent.supportAgentTeams.length > 0) {
     const team = agent.supportAgentTeams[0];
-    // ✅ استفاده از optional chaining برای جلوگیری از خطا
     const teamData = team?.team;
     if (teamData) {
       departmentName = teamData.name;
@@ -52,7 +51,7 @@ const mapAgentToMember = (
   
   const username = staffInfo?.name?.toLowerCase().replace(/\s/g, '') || `user${agent.id}`;
   
-  return {
+  const member: Member = {
     id: agent.id,
     firstName,
     lastName,
@@ -65,8 +64,16 @@ const mapAgentToMember = (
     presence: agent.lastOnlineAt ? 'online' : 'offline',
     lastActivity: agent.lastOnlineAt ? 'آنلاین' : 'آفلاین',
     openTickets: 0,
-    staffId: staffInfo?.staffId || 0,
+    staffId: agent.id, // ✅ مستقیماً از agent.id استفاده کن
   };
+  
+  console.log(`📋 Member ساخته شد:`, { 
+    id: member.id, 
+    staffId: member.staffId, 
+    name: member.firstName + ' ' + member.lastName 
+  });
+  
+  return member;
 };
 
 const calculateStats = (members: Member[]): StatsData => {
@@ -124,6 +131,7 @@ export function useMembers() {
         return;
       }
       
+      // ✅ برای هر Agent، Staff رو دریافت کن و اطلاعات رو تکمیل کن
       const staffPromises = agents.map(async (agent) => {
         if (agent.venokStaffId) {
           const staff = await fetchStaff(agent.venokStaffId);
@@ -144,20 +152,20 @@ export function useMembers() {
       });
       setStaffIdMap(staffMap);
       
-      let maxVenokStaffId = 0;
+      let maxStaffId = 0;
       for (const agent of agents) {
-        if (agent.venokStaffId > maxVenokStaffId) {
-          maxVenokStaffId = agent.venokStaffId;
+        if (agent.venokStaffId > maxStaffId) {
+          maxStaffId = agent.venokStaffId;
         }
       }
       
       const staffCount = await getStaffCount();
-      const newCounter = Math.max(maxVenokStaffId, staffCount);
+      const newCounter = Math.max(maxStaffId, staffCount);
       setVenokStaffCounter(newCounter);
       
-      const memberList = agents
-        .filter(agent => agent.supportAgentTeams && agent.supportAgentTeams.length > 0)
-        .map(agent => mapAgentToMember(agent, deptList, staffMap));
+      const memberList = agents.map(agent => mapAgentToMember(agent, deptList, staffMap));
+      
+      console.log('📋 لیست نهایی Members:', memberList.map(m => ({ id: m.id, staffId: m.staffId, name: m.firstName + ' ' + m.lastName })));
       
       setMembers(memberList);
       console.log(`✅ ${memberList.length} عضو بارگذاری شد`);
@@ -211,20 +219,17 @@ export function useMembers() {
         throw new Error(`تیم "${selectedDept.name}" در سرور یافت نشد.`);
       }
 
-      const headers = await getHeadersWithRefresh();
+      const staffResult = await createStaff({
+        name: fullName,
+        code: code,
+        phone: data.phone,
+        password: data.password || '12345678',
+        departmentId: realTeamId,
+        role: data.role === "مدیر دپارتمان" ? "department_manager" : "staff",
+        isActive: data.status === 'active',
+      });
       
-      const staffResult = await createStaff(fullName, code);
-      
-      const newVenokStaffId = venokStaffCounter + 1;
-      setVenokStaffCounter(newVenokStaffId);
-
-      const agentResult = await createAgent(
-        newVenokStaffId,
-        fullName,
-        headers
-      );
-
-      await assignAgentToTeam(agentResult.id, realTeamId, data.role);
+      console.log('✅ Staff ایجاد شد:', staffResult);
 
       await loadData();
       
@@ -241,68 +246,110 @@ export function useMembers() {
     }
   };
 
-  const handleEditMember = async (data: {
-    fullName: string;
-    phone: string;
-    departmentId: number;
-    role: "مدیر دپارتمان" | "کارمند";
-    status: "active" | "inactive";
-    password?: string;
-  }, editingMember: Member | null) => {
-    if (!editingMember) return;
+ // ============================================================
+// FILE: components/dashboard/members/hooks/useMembers.ts
+// فقط بخش handleEditMember اصلاح شده
+// ============================================================
+const handleEditMember = async (data: {
+  fullName: string;
+  phone: string;
+  departmentId: number;
+  role: "مدیر دپارتمان" | "کارمند";
+  status: "active" | "inactive";
+  password?: string;
+}, editingMember: Member | null) => {
+  if (!editingMember) return;
+  
+  try {
+    setIsSubmitting(true);
     
-    try {
-      setIsSubmitting(true);
-      
-      await updateAgent(editingMember.id, data.status === 'active');
-      
-      if (data.password) {
-        try {
-          const staffId = editingMember.staffId;
-          if (staffId) {
-            await updateStaff(staffId, data.password);
-          }
-        } catch (staffError) {
-          console.warn('⚠️ خطا در به‌روزرسانی Staff، اما ادامه می‌دهیم:', staffError);
-        }
-      }
-      
-      const selectedDept = departments.find(d => d.id === data.departmentId);
-      if (!selectedDept) {
-        throw new Error('دپارتمان انتخاب شده یافت نشد');
-      }
-      
-      let realTeamId = teamIdMap.get(selectedDept.name);
-      
-      if (!realTeamId) {
-        const teams = await fetchTeams();
-        const foundTeam = teams.find((t: TeamResponse) => t.name === selectedDept.name);
-        if (foundTeam) {
-          realTeamId = foundTeam.id;
-          setTeamIdMap(prev => new Map(prev).set(selectedDept.name, foundTeam.id));
-        }
-      }
-      
-      if (!realTeamId) {
-        throw new Error(`تیم "${selectedDept.name}" در سرور یافت نشد.`);
-      }
-      
-      await assignAgentToTeam(editingMember.id, realTeamId, data.role);
-      
-      await loadData();
-      
-      showSuccess(`عضو "${data.fullName}" با موفقیت ویرایش شد`, "موفقیت ✨");
-      
-    } catch (error) {
-      console.error('❌ خطا در ویرایش عضو:', error);
-      showError(
-        error instanceof Error ? error.message : "خطا در ویرایش عضو",
-        "خطا"
-      );
-    } finally {
-      setIsSubmitting(false);
+    const staffId = editingMember.staffId || editingMember.id;
+    
+    console.log(`🔄 شروع ویرایش عضو با staffId: ${staffId}`, {
+      memberId: editingMember.id,
+      staffId: editingMember.staffId,
+      oldDepartmentId: editingMember.departmentId,
+      newDepartmentId: data.departmentId,
+      oldRole: editingMember.role,
+      newRole: data.role,
+      fullName: data.fullName,
+      phone: data.phone,
+      status: data.status,
+      hasPassword: !!data.password,
+    });
+    
+    // ✅ 1. به‌روزرسانی وضعیت فعال/غیرفعال
+    await updateAgent(staffId, data.status === 'active');
+    console.log(`✅ وضعیت عضو با staffId ${staffId} به‌روزرسانی شد`);
+    
+    // ✅ 2. به‌روزرسانی اطلاعات اصلی Staff
+    const updateData: any = {};
+    
+    const currentFullName = `${editingMember.firstName} ${editingMember.lastName}`.trim();
+    if (data.fullName && data.fullName.trim() !== currentFullName) {
+      updateData.name = data.fullName.trim();
+      console.log(`📝 تغییر نام: ${currentFullName} → ${data.fullName.trim()}`);
     }
-  };
+    
+    if (data.phone && data.phone !== editingMember.phone) {
+      updateData.phone = data.phone;
+      console.log(`📝 تغییر شماره: ${editingMember.phone} → ${data.phone}`);
+    }
+    
+    if (data.password) {
+      updateData.password = data.password;
+      console.log(`📝 تغییر رمز عبور: ****`);
+    }
+    
+    // ✅ 3. به‌روزرسانی دپارتمان و نقش
+    const selectedDept = departments.find(d => d.id === data.departmentId);
+    if (!selectedDept) {
+      throw new Error('دپارتمان انتخاب شده یافت نشد');
+    }
+    
+    let realTeamId = teamIdMap.get(selectedDept.name);
+    
+    if (!realTeamId) {
+      const teams = await fetchTeams();
+      const foundTeam = teams.find((t: TeamResponse) => t.name === selectedDept.name);
+      if (foundTeam) {
+        realTeamId = foundTeam.id;
+        setTeamIdMap(prev => new Map(prev).set(selectedDept.name, foundTeam.id));
+      }
+    }
+    
+    if (!realTeamId) {
+      throw new Error(`تیم "${selectedDept.name}" در سرور یافت نشد.`);
+    }
+    
+    // ✅ 4. اگر تغییری در اطلاعات وجود دارد، به‌روزرسانی کن
+    if (Object.keys(updateData).length > 0) {
+      console.log(`📤 به‌روزرسانی اطلاعات Staff ${staffId}:`, updateData);
+      await updateStaff(staffId, updateData);
+      console.log(`✅ اطلاعات Staff ${staffId} به‌روزرسانی شد`);
+    }
+    
+    // ✅ 5. اختصاص به دپارتمان جدید (با نقش جدید)
+    console.log(`📤 اختصاص Staff ${staffId} به تیم ${realTeamId} با نقش ${data.role}`);
+    await assignAgentToTeam(staffId, realTeamId, data.role);
+    console.log(`✅ Staff ${staffId} به تیم ${realTeamId} اختصاص یافت`);
+    
+    // ✅ 6. بارگذاری مجدد داده‌ها
+    await loadData();
+    
+    showSuccess(`عضو "${data.fullName}" با موفقیت ویرایش شد`, "موفقیت ✨");
+    
+  } catch (error) {
+    console.error('❌ خطا در ویرایش عضو:', error);
+    showError(
+      error instanceof Error ? error.message : "خطا در ویرایش عضو",
+      "خطا"
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+// ============================================================
 
   const handleRemoveMember = async (member: Member) => {
     const fullName = `${member.firstName} ${member.lastName}`;
@@ -314,11 +361,10 @@ export function useMembers() {
         try {
           setIsSubmitting(true);
           
-          await deleteAgent(member.id);
+          const staffId = member.staffId || member.id;
+          console.log(`🗑️ حذف Staff با id: ${staffId}`);
           
-          if (member.staffId) {
-            await deleteStaff(member.staffId);
-          }
+          await deleteStaff(staffId);
           
           await loadData();
           
@@ -351,3 +397,4 @@ export function useMembers() {
     handleRemoveMember,
   };
 }
+// ============================================================

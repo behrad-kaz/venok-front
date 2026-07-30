@@ -215,6 +215,8 @@ export default function Step3Members({
       showWarning("لطفاً تمام فیلدهای الزامی را پر کنید");
       return;
     }
+
+    // ✅ اعتبارسنجی رمز عبور
     if (newMember.password.length < 8) {
       console.warn("⚠️ رمز عبور کمتر از ۸ کاراکتر");
       showWarning("رمز عبور باید حداقل ۸ کاراکتر باشد");
@@ -252,10 +254,12 @@ export default function Step3Members({
 
       const code = generateUniqueCode(newMember.phone);
 
+      // ✅ ایجاد Staff با داده‌های کامل - رمز عبور را حتماً ارسال کن
       const staffResult = await createStaff({
         name: newMember.fullName,
         code: code,
         phone: newMember.phone,
+        password: newMember.password, // ✅ رمز عبور باید ارسال شود
         email: "",
         departmentId: departmentIdNumber,
         role: newMember.role === "manager" ? "department_manager" : "staff",

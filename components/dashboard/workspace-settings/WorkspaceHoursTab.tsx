@@ -9,6 +9,7 @@ interface WorkspaceHoursTabProps {
   onHoursChange: (hours: WorkingHours) => void;
 }
 
+// ✅ ترتیب صحیح روزها از شنبه شروع می‌شود
 const dayNames: Record<string, string> = {
   saturday: "شنبه",
   sunday: "یکشنبه",
@@ -18,6 +19,21 @@ const dayNames: Record<string, string> = {
   thursday: "پنجشنبه",
   friday: "جمعه",
 };
+
+// ✅ آرایه مرتب شده از کلیدها
+const orderedDays = ["saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday"];
+
+// ✅ لیست کامل مناطق زمانی
+const timezones = [
+  { value: "Asia/Tehran", label: "تهران (UTC+3:30)" },
+  { value: "Asia/Dubai", label: "دبی (UTC+4:00)" },
+  { value: "Europe/Istanbul", label: "استانبول (UTC+3:00)" },
+  { value: "Europe/London", label: "لندن (UTC+0:00)" },
+  { value: "America/New_York", label: "نیویورک (UTC-5:00)" },
+  { value: "America/Los_Angeles", label: "لس آنجلس (UTC-8:00)" },
+  { value: "Asia/Tokyo", label: "توکیو (UTC+9:00)" },
+  { value: "Australia/Sydney", label: "سیدنی (UTC+11:00)" },
+];
 
 export default function WorkspaceHoursTab({ hours, onHoursChange }: WorkspaceHoursTabProps) {
   const toggleWorkingDay = (day: string) => {
@@ -34,21 +50,24 @@ export default function WorkspaceHoursTab({ hours, onHoursChange }: WorkspaceHou
       <div className="space-y-5">
         <div>
           <label className="block text-sm font-medium text-white mb-3">روزهای کاری</label>
-          <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
-            {Object.entries(hours.workingDays).map(([day, isActive]) => (
-              <button
-                key={day}
-                type="button"
-                onClick={() => toggleWorkingDay(day)}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                  isActive
-                    ? "bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F]"
-                    : "bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)]"
-                }`}
-              >
-                {dayNames[day]}
-              </button>
-            ))}
+          <div className="grid grid-cols-7 gap-2">
+            {orderedDays.map((day) => {
+              const isActive = hours.workingDays[day as keyof typeof hours.workingDays];
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleWorkingDay(day)}
+                  className={`px-2 py-2 rounded-xl text-sm font-medium transition-all ${
+                    isActive
+                      ? "bg-gradient-to-r from-[#59D8C3] to-[#5BE0A8] text-[#06110F]"
+                      : "bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)]"
+                  }`}
+                >
+                  {dayNames[day]}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -88,10 +107,13 @@ export default function WorkspaceHoursTab({ hours, onHoursChange }: WorkspaceHou
               backgroundSize: "16px",
             }}
           >
-            <option value="Asia/Tehran" className="bg-[#0D1B17] text-white">تهران (UTC+3:30)</option>
-            <option value="Asia/Dubai" className="bg-[#0D1B17] text-white">دبی (UTC+4)</option>
-            <option value="Europe/Istanbul" className="bg-[#0D1B17] text-white">استانبول (UTC+3)</option>
+            {timezones.map((tz) => (
+              <option key={tz.value} value={tz.value} className="bg-[#0D1B17] text-white">
+                {tz.label}
+              </option>
+            ))}
           </select>
+          <p className="text-xs text-gray-500 mt-1">این مقدار با تنظیمات Workspace هماهنگ است</p>
         </div>
 
         <div>

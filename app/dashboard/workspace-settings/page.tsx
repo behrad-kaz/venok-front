@@ -1,3 +1,5 @@
+// app/dashboard/workspace-settings/page.tsx
+
 "use client";
 
 import { useState } from "react";
@@ -18,35 +20,27 @@ export default function WorkspaceSettingsPage() {
   const [activeTab, setActiveTab] = useState<WorkspaceTabType>("company");
   
   const {
-    // Stateها
     companyInfo,
     supportInfo,
     workingHours,
     notificationSettings,
     securitySettings,
-    sessions,
     setupItems,
     isSaving,
     hasChanges,
     
-    // Setters
     setCompanyInfo,
     setSupportInfo,
     setWorkingHours,
     setNotificationSettings,
     setSecuritySettings,
-    setSessions,
     setSetupItems,
     
-    // Handlers
     handleCompleteSetupItem,
-    handleLogoutAll,
-    handleLogoutSession,
     handleCheckSmsConnection,
     handleSave,
     handleCancel,
     
-    // Data
     smsCredit,
     smsStatus,
     lastSmsSent,
@@ -63,7 +57,7 @@ export default function WorkspaceSettingsPage() {
             <WorkspaceUnsavedAlert 
               onSave={handleSave} 
               onCancel={handleCancel}
-              isSaving={isSaving}  // ✅ پاس دادن isSaving
+              isSaving={isSaving}
             />
           )}
 
@@ -98,9 +92,6 @@ export default function WorkspaceSettingsPage() {
             <WorkspaceSecurityTab
               settings={securitySettings}
               onSettingsChange={setSecuritySettings}
-              sessions={sessions}
-              onLogoutAll={handleLogoutAll}
-              onLogoutSession={handleLogoutSession}
             />
           )}
 
