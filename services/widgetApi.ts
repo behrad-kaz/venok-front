@@ -1,4 +1,6 @@
-// services/widgetApi.ts
+// ============================================================
+// FILE: services/widgetApi.ts
+// ============================================================
 import { api } from './api-client';
 
 const API_URL = 'http://localhost:3000';
@@ -32,8 +34,8 @@ interface WidgetConfigResponse {
   }[];
 }
 
+// ✅ حذف widgetToken از UpdateWidgetRequest (چون نباید قابل تغییر باشد)
 interface UpdateWidgetRequest {
-  widgetToken?: string;
   companyName?: string;
   logoUrl?: string | null;
   primaryColor?: string;
@@ -66,3 +68,4 @@ export const updateWidgetConfig = async (data: UpdateWidgetRequest): Promise<Wid
   
   return api.patch<WidgetConfigResponse>('/widget', data);
 };
+// ============================================================

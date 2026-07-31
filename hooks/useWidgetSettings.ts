@@ -44,15 +44,13 @@ export function useWidgetSettings() {
   const isLoadedRef = useRef(false);
   const isLoadingRef = useRef(false);
 
-  // بارگذاری تنظیمات از API - با جلوگیری از درخواست‌های تکراری
+  // بارگذاری تنظیمات از API
   const loadConfig = useCallback(async () => {
-    // ✅ جلوگیری از درخواست‌های همزمان
     if (isLoadingRef.current) {
       console.log('⏳ درخواست قبلی در حال انجام است، صرف نظر...');
       return;
     }
     
-    // ✅ جلوگیری از بارگذاری مجدد
     if (isLoadedRef.current) {
       console.log('✅ تنظیمات قبلاً بارگذاری شده است');
       return;
@@ -98,7 +96,6 @@ export function useWidgetSettings() {
       
     } catch (error) {
       console.error('❌ خطا در بارگذاری تنظیمات ویجت:', error);
-      // ✅ نمایش خطا فقط یک بار
       if (!isLoadedRef.current) {
         showError('خطا در بارگذاری تنظیمات ویجت', 'خطا');
       }
@@ -108,17 +105,16 @@ export function useWidgetSettings() {
     }
   }, [showError]);
 
-  // ✅ بارگذاری اولیه فقط یک بار
   useEffect(() => {
     if (!isLoadedRef.current && !isLoadingRef.current) {
       loadConfig();
     }
   }, [loadConfig]);
 
-  // بررسی تغییرات
   const checkChanges = useCallback(() => {
     if (!initialConfig) return false;
     
+    // ✅ حذف widgetToken از مقایسه چون نباید تغییر کند
     const current = {
       companyName: config.companyName,
       logoUrl: config.logoUrl,
@@ -164,12 +160,10 @@ export function useWidgetSettings() {
     return hasChanged;
   }, [config, initialConfig]);
 
-  // بررسی تغییرات در هر بار تغییر config
   useEffect(() => {
     checkChanges();
   }, [config, checkChanges]);
 
-  // ذخیره تنظیمات
   const handleSave = useCallback(async () => {
     if (!hasChanges) {
       showInfo('هیچ تغییری برای ذخیره وجود ندارد', 'اطلاعات');
@@ -179,8 +173,8 @@ export function useWidgetSettings() {
     setIsSaving(true);
     
     try {
+      // ✅ حذف widgetToken از داده‌های ارسالی
       const updateData = {
-        widgetToken: config.widgetToken,
         companyName: config.companyName,
         logoUrl: config.logoUrl,
         primaryColor: config.primaryColor,
@@ -221,7 +215,6 @@ export function useWidgetSettings() {
     }
   }, [config, hasChanges, showSuccess, showError, showInfo]);
 
-  // لغو تغییرات
   const handleCancel = useCallback(() => {
     if (!initialConfig) return;
     
@@ -236,7 +229,6 @@ export function useWidgetSettings() {
     );
   }, [initialConfig, showConfirm, showInfo]);
 
-  // به‌روزرسانی فیلد
   const updateField = useCallback(<K extends keyof WidgetConfig>(
     field: K,
     value: WidgetConfig[K]
@@ -244,7 +236,6 @@ export function useWidgetSettings() {
     setConfig(prev => ({ ...prev, [field]: value }));
   }, []);
 
-  // اضافه کردن دامنه
   const addDomain = useCallback((domain: string) => {
     if (!domain.trim()) return;
     if (config.allowedDomains.includes(domain.trim())) {
@@ -254,12 +245,10 @@ export function useWidgetSettings() {
     updateField('allowedDomains', [...config.allowedDomains, domain.trim()]);
   }, [config.allowedDomains, updateField, showInfo]);
 
-  // حذف دامنه
   const removeDomain = useCallback((domain: string) => {
     updateField('allowedDomains', config.allowedDomains.filter(d => d !== domain));
   }, [config.allowedDomains, updateField]);
 
-  // تغییر وضعیت دپارتمان
   const toggleDepartmentStatus = useCallback((departmentId: number) => {
     const dept = config.departments.find(d => d.id === departmentId);
     if (!dept) return;
