@@ -15,6 +15,8 @@ import MemberSidebar from "@/components/dashboard/members/MemberSidebar";
 import DepartmentMemberCard from "@/components/dashboard/members/DepartmentMemberCard";
 import DepartmentStatsCards from "@/components/dashboard/members/DepartmentStatsCards";
 import { useMembers } from "@/components/dashboard/members/hooks/useMembers";
+import { authService } from "@/services/auth.service";
+import { api } from "@/services/api-client";
 
 export default function MembersPage() {
   const { role } = useRoleStore();
@@ -41,12 +43,54 @@ export default function MembersPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   
+  // ✅ دریافت departmentId کاربر جاری از localStorage
+  const [currentUserDepartmentId, setCurrentUserDepartmentId] = useState<number | null>(null);
+  const [currentUserDepartmentName, setCurrentUserDepartmentName] = useState<string>("");
+  
+  // بارگذاری اطلاعات دپارتمان کاربر جاری
+  useEffect(() => {
+    const loadUserDepartment = async () => {
+      try {
+        const staffId = authService.getStaffId();
+        if (!staffId) {
+          console.warn('⚠️ staffId وجود ندارد');
+          return;
+        }
+        
+        // دریافت اطلاعات staff از API
+        const response = await api.get<{ 
+          id: number; 
+          departmentId: number | null; 
+          role: string; 
+          name: string;
+          department?: { id: number; name: string; color: string };
+        }>(`/staff/${staffId}`);
+        
+        if (response.departmentId) {
+          setCurrentUserDepartmentId(response.departmentId);
+          setCurrentUserDepartmentName(response.department?.name || '');
+          console.log(`✅ دپارتمان کاربر جاری: ${response.department?.name} (${response.departmentId})`);
+        } else {
+          console.warn('⚠️ کاربر جاری دپارتمان ندارد');
+        }
+      } catch (error) {
+        console.error('❌ خطا در دریافت اطلاعات دپارتمان کاربر:', error);
+      }
+    };
+    
+    if (role === 'مدیر') {
+      loadUserDepartment();
+    }
+  }, [role]);
+
   // برای مدیر دپارتمان
   const [deptSearchQuery, setDeptSearchQuery] = useState("");
   const [deptPresenceFilter, setDeptPresenceFilter] = useState("all");
   const [deptStatusFilter, setDeptStatusFilter] = useState("all");
   
-  const managerDepartment = "پشتیبانی";
+  // ✅ برای مدیر دپارتمان، از departmentId واقعی کاربر استفاده کن
+  const managerDepartmentName = currentUserDepartmentName || "پشتیبانی";
+  const managerDepartmentId = currentUserDepartmentId;
 
   // ✅ وقتی پارامتر department از URL تغییر کرد، selectedDepartment رو به‌روز کن
   useEffect(() => {
@@ -78,7 +122,9 @@ export default function MembersPage() {
 
   // فیلتر کردن اعضا برای مدیر دپارتمان
   const filteredDeptMembers = members.filter((member) => {
-    if (member.departmentName !== managerDepartment) return false;
+    // ✅ فقط اعضایی که دپارتمان آنها برابر با دپارتمان مدیر است
+    if (member.departmentId !== managerDepartmentId) return false;
+    
     const fullName = `${member.firstName} ${member.lastName}`;
     if (deptSearchQuery && !fullName.includes(deptSearchQuery) && !member.username.includes(deptSearchQuery)) {
       return false;
@@ -104,6 +150,20 @@ export default function MembersPage() {
     setIsSidebarOpen(true);
   };
 
+  // نمایش لودینگ تا زمانی که دپارتمان کاربر بارگذاری شود
+  if (role === 'مدیر' && isLoading) {
+    return (
+      <RoleGuard allowedRoles={["مدیر کل", "مدیر"]}>
+        <DashboardLayout>
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-[#59D8C3] animate-spin" />
+            <span className="mr-3 text-gray-400">در حال بارگذاری اطلاعات...</span>
+          </div>
+        </DashboardLayout>
+      </RoleGuard>
+    );
+  }
+
   if (isLoading) {
     return (
       <RoleGuard allowedRoles={["مدیر کل", "مدیر"]}>
@@ -119,13 +179,26 @@ export default function MembersPage() {
 
   // ========== صفحه مدیر دپارتمان ==========
   if (role === "مدیر") {
+    // ✅ اگر هنوز دپارتمان کاربر مشخص نشده، پیام مناسب نمایش بده
+    if (!managerDepartmentId) {
+      return (
+        <RoleGuard allowedRoles={["مدیر"]}>
+          <DashboardLayout>
+            <div className="text-center py-12">
+              <p className="text-gray-400">در حال بارگذاری اطلاعات دپارتمان شما...</p>
+            </div>
+          </DashboardLayout>
+        </RoleGuard>
+      );
+    }
+
     return (
       <RoleGuard allowedRoles={["مدیر"]}>
         <DashboardLayout>
           <div className="space-y-6">
             <div>
               <h1 className="text-2xl font-bold text-white mb-1">اعضای دپارتمان</h1>
-              <p className="text-sm text-gray-500">لیست و مدیریت اعضای دپارتمان {managerDepartment}</p>
+              <p className="text-sm text-gray-500">لیست و مدیریت اعضای دپارتمان {managerDepartmentName}</p>
             </div>
 
             <div className="flex items-center justify-between gap-4 flex-wrap">

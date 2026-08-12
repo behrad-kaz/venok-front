@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import DepartmentDashboard from "@/components/dashboard/DepartmentDashboard";
-import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 import { useRoleStore } from "@/stores/useRoleStore";
+import { authService } from "@/services/auth.service";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 
 // کامپوننت‌های جدید برای مدیر کل
 import StatsCards from "@/components/dashboard/admin/StatsCards";
@@ -17,13 +18,14 @@ import RecentConversations from "@/components/dashboard/admin/RecentConversation
 
 type UserRole = "مدیر کل" | "مدیر" | "کارمند";
 
-// تابع subscribe برای localStorage
 const subscribeToLocalStorage = (callback: () => void) => {
   window.addEventListener('storage', callback);
   window.addEventListener('roleChanged', callback);
+  window.addEventListener('authChange', callback);
   return () => {
     window.removeEventListener('storage', callback);
     window.removeEventListener('roleChanged', callback);
+    window.removeEventListener('authChange', callback);
   };
 };
 
@@ -33,35 +35,55 @@ const getSavedRole = (): UserRole | null => {
 };
 
 export default function DashboardPage() {
-  const { role, setRole } = useRoleStore();
+  const { role, setRole, loadRoleFromStorage } = useRoleStore();
   const router = useRouter();
   const [dateRange, setDateRange] = useState("today");
+  const [isLoading, setIsLoading] = useState(true);
   
-  // استفاده از useSyncExternalStore برای همگام‌سازی خودکار با localStorage
+  // ✅ استفاده از هوک آمار داینامیک
+  const { stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats();
+
   const savedRole = useSyncExternalStore(subscribeToLocalStorage, getSavedRole, () => null);
-  
-  // همگام‌سازی نقش ذخیره شده با store
+
+  useEffect(() => {
+    loadRoleFromStorage();
+  }, [loadRoleFromStorage]);
+
   useEffect(() => {
     if (savedRole && savedRole !== role) {
       setRole(savedRole);
     }
+    setIsLoading(false);
   }, [savedRole, role, setRole]);
 
-  const statsData = {
-    openConversations: 24,
-    waitingForResponse: 8,
-    avgResponseTime: "۱۲ دقیقه",
-    solvedToday: 15,
-  };
-
-  // اگر کارمند است، به صفحه گفتگوهای من ریدایرکت شود
   useEffect(() => {
-    if (role === "کارمند") {
-      router.push("/dashboard/my-conversations");
+    if (!isLoading && !authService.isTokenValid()) {
+      router.push("/login");
     }
-  }, [role, router]);
+  }, [isLoading, router]);
 
-  // نمایش داشبورد مخصوص مدیر دپارتمان
+  useEffect(() => {
+    if (!isLoading && role === "کارمند") {
+      router.push("/dashboard/conversations");
+    }
+  }, [isLoading, role, router]);
+
+  // نمایش لودینگ
+  if (isLoading || statsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#062723] to-[#020504] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-[#59D8C3] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400 text-sm">در حال بارگذاری داشبورد...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (role === "کارمند") {
+    return null;
+  }
+
   if (role === "مدیر") {
     return (
       <DashboardLayout>
@@ -70,12 +92,7 @@ export default function DashboardPage() {
     );
   }
 
-  // برای کارمند، ریدایرکت انجام می‌شود (در useEffect)
-  if (role === "کارمند") {
-    return null;
-  }
-
-  // نمایش داشبورد مدیر کل
+  // ✅ مدیر کل: نمایش داشبورد مدیر کل با آمار داینامیک
   return (
     <DashboardLayout>
       <div className="space-y-5">
@@ -97,14 +114,32 @@ export default function DashboardPage() {
           </select>
         </div>
 
-        <StatsCards data={statsData} />
-        <AttentionNeeded />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <ConversationTrend />
-          <WorkspaceStatus />
-        </div>
-        <DepartmentsTable />
-        <RecentConversations />
+        {statsError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            خطا در دریافت آمار: {statsError}
+          </div>
+        )}
+
+        {stats && (
+          <>
+            <StatsCards 
+              data={{
+                openConversations: stats.openConversations,
+                waitingForFirstResponse: stats.waitingForFirstResponse,
+                avgResponseTime: stats.avgResponseTime,
+                solvedToday: stats.solvedToday,
+              }}
+              changes={stats.changes}
+            />
+            <AttentionNeeded />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <ConversationTrend />
+              <WorkspaceStatus />
+            </div>
+            <DepartmentsTable />
+            <RecentConversations />
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

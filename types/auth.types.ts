@@ -21,6 +21,7 @@ export interface UserModel {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  role?: string;
 }
 
 // مدل Workspace
@@ -93,4 +94,25 @@ export interface StoredUserData {
   userPhone: string;
   currentOrganizationId?: number;
   currentWorkspaceId?: number;
+  staffId?: number;
+  staffRole?: string;
+  staffName?: string;
+}
+
+// ✅ تایپ جدید برای پاسخ لاگین از بک‌اند
+export interface LoginApiResponse {
+  access_token: string;
+  user: {
+    id: number;
+    email: string;
+    mobile: string;
+    firstName: string;
+    lastName: string;
+    role: string; // 'admin' یا 'user'
+    avatar: string | null;
+    organizationId: number | null;
+    staffId: number | null;
+    staffRole: string | null;
+    staffName: string | null; // ✅ اضافه شد
+  };
 }

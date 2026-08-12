@@ -1,7 +1,6 @@
-// components/dashboard/RoleGuard.tsx
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { useRoleStore } from "@/stores/useRoleStore";
 import NotFound from "./NotFound";
 
@@ -12,7 +11,12 @@ interface RoleGuardProps {
 }
 
 export default function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) {
-  const { role } = useRoleStore();
+  const { role, loadRoleFromStorage } = useRoleStore();
+
+  // ✅ بارگذاری نقش از localStorage هنگام mount
+  useEffect(() => {
+    loadRoleFromStorage();
+  }, [loadRoleFromStorage]);
 
   if (!allowedRoles.includes(role)) {
     return fallback || <NotFound />;

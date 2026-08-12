@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, User, Clock, MessageSquare } from "lucide-react";
+import { Search, User, MessageSquare } from "lucide-react";
 import { Conversation, StatusFilter } from "./types";
 import { getStatusBadge } from "./data";
 import { UserRole } from "@/stores/useRoleStore";
@@ -19,6 +19,7 @@ interface ConversationListProps {
   isTablet?: boolean;
   role: UserRole;
   isLoading?: boolean;
+  currentUserName?: string | null; 
 }
 
 export default function ConversationList({
@@ -35,7 +36,49 @@ export default function ConversationList({
   isTablet = false,
   role,
   isLoading = false,
+  currentUserName = null,
 }: ConversationListProps) {
+  
+  // ✅ لاگ برای دیباگ (فقط در حالت توسعه)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('📦 [DEBUG] کل مکالمات دریافتی:', conversations?.length || 0);
+    console.log('👤 [DEBUG] نقش فعلی کاربر:', role);
+    console.log('📛 [DEBUG] نام کاربر لاگین شده (currentUserName):', currentUserName);
+    
+    if (conversations && conversations.length > 0) {
+      console.log('🆔 [DEBUG] جزئیات مکالمه اول:', {
+        id: conversations[0].id,
+        assignee: conversations[0].assignee,
+        assigneeId: conversations[0].assigneeId,
+        status: conversations[0].status,
+        customer: conversations[0].customerName,
+        customerId: conversations[0].customerId,
+      });
+    }
+  }
+
+  // ✅ فیلتر کردن گفتگوها بر اساس نقش و جستجو
+  const filteredConversations = (conversations || []).filter((conv) => {
+    // فیلتر وضعیت
+    const matchesFilter = activeFilter === 'all' || conv.status === activeFilter;
+
+    // فیلتر جستجو
+    const searchLower = searchQuery.toLowerCase().trim();
+    if (searchLower) {
+      const matchName = conv.customerName?.toLowerCase().includes(searchLower) || false;
+      const matchPhone = conv.customerPhone?.toLowerCase().includes(searchLower) || false;
+      const matchSubject = conv.subject?.toLowerCase().includes(searchLower) || false;
+      const matchAssignee = conv.assignee?.toLowerCase().includes(searchLower) || false;
+      const matchDepartment = conv.department?.toLowerCase().includes(searchLower) || false;
+      
+      if (!matchName && !matchPhone && !matchSubject && !matchAssignee && !matchDepartment) {
+        return false;
+      }
+    }
+
+    return matchesFilter;
+  });
+
   // نمایش وضعیت لودینگ
   if (isLoading) {
     return (
@@ -51,15 +94,13 @@ export default function ConversationList({
   }
 
   return (
-    <div
-      className={`h-full flex flex-col rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] overflow-hidden transition-all duration-300`}
-    >
+    <div className="h-full flex flex-col rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] overflow-hidden transition-all duration-300">
       {/* جستجو */}
-      <div className="p-4 border-b border-[rgba(255,255,255,0.1)]">
+      <div className="p-4 border-b border-[rgba(255,255,255,0.1)] flex-shrink-0">
         <div className="relative">
           <input
             type="text"
-            placeholder="جستجو بر اساس شماره، نام مشتری یا موضوع"
+            placeholder="جستجو بر اساس شماره، نام مشتری، موضوع، مسئول یا دپارتمان"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full px-4 py-2.5 pr-10 rounded-xl text-sm bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 focus:outline-none focus:border-[#59D8C3] transition-colors"
@@ -98,14 +139,28 @@ export default function ConversationList({
 
       {/* لیست گفتگوها */}
       <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-[rgba(255,255,255,0.05)] [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.3)] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[rgba(89,216,195,0.5)] p-3 space-y-2">
-        {conversations.length === 0 ? (
+        {filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-12">
             <MessageSquare className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400 text-sm">هیچ گفتگویی یافت نشد</p>
-            <p className="text-gray-500 text-xs mt-1">گفتگوهای جدید در اینجا نمایش داده می‌شوند</p>
+            <p className="text-gray-400 text-sm">
+              {searchQuery ? 'هیچ گفتگویی با این جستجو یافت نشد' : 'هیچ گفتگویی یافت نشد'}
+            </p>
+            {role === 'کارمند' && !searchQuery && (
+              <p className="text-gray-500 text-xs mt-1">
+                هیچ گفتگویی به شما اختصاص داده نشده است
+              </p>
+            )}
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange('')}
+                className="mt-2 text-xs text-[#59D8C3] hover:text-[#6ef3dc] transition-colors"
+              >
+                پاک کردن جستجو
+              </button>
+            )}
           </div>
         ) : (
-          conversations.map((conv) => {
+          filteredConversations.map((conv) => {
             const badge = getStatusBadge(conv.status);
             const isSelected = selectedConversation?.id === conv.id && !showDetails;
             
@@ -131,8 +186,14 @@ export default function ConversationList({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="flex-1 min-w-0">
+                        {/* ✅ نمایش نام مشتری (از customerName که از بک‌اند می‌آید) */}
                         <h4 className="text-sm font-semibold text-white truncate">
                           {conv.customerName || 'مشتری ناشناس'}
+                          {conv.customerId && (
+                            <span className="text-[10px] text-gray-500 mr-1">
+                              (ID: {conv.customerId})
+                            </span>
+                          )}
                         </h4>
                         <p className="text-xs text-gray-500 truncate">
                           {conv.subject || 'بدون موضوع'}
@@ -160,6 +221,7 @@ export default function ConversationList({
                             {conv.department}
                           </span>
                         )}
+                        {/* نمایش نام مسئول (assignee) */}
                         {conv.assignee && (
                           <span className="text-[10px] text-[#59D8C3] px-2 py-0.5 rounded-full bg-[rgba(89,216,195,0.08)]">
                             {conv.assignee}

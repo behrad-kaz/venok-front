@@ -7,29 +7,60 @@ import { MessageCircle, Clock, CheckCircle, AlertCircle } from "lucide-react";
 interface StatsCardsProps {
   data: {
     openConversations: number;
-    waitingForResponse: number;
+    waitingForFirstResponse: number;
     avgResponseTime: string;
     solvedToday: number;
   };
+  changes?: {
+    openConversations: number;
+    waitingForFirstResponse: number;
+    solvedToday: number;
+  };
+  isLoading?: boolean;
 }
 
-export default function StatsCards({ data }: StatsCardsProps) {
+export default function StatsCards({ data, changes, isLoading = false }: StatsCardsProps) {
+  const getChangeText = (value: number) => {
+    if (value === 0) return 'بدون تغییر';
+    const prefix = value > 0 ? '+' : '';
+    return `${prefix}${value} از دیروز`;
+  };
+
+  const getChangeType = (value: number): "positive" | "negative" | "neutral" => {
+    if (value === 0) return 'neutral';
+    return value > 0 ? 'positive' : 'negative';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="p-5 rounded-2xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] animate-pulse">
+            <div className="w-10 h-10 rounded-xl bg-[rgba(255,255,255,0.05)] mb-3" />
+            <div className="h-3 bg-[rgba(255,255,255,0.05)] rounded w-1/2 mb-2" />
+            <div className="h-8 bg-[rgba(255,255,255,0.05)] rounded w-3/4" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const stats = [
     {
       id: 1,
       title: "گفتگوهای باز",
       value: data.openConversations,
-      change: "+۳ از دیروز",
-      changeType: "positive",
+      change: getChangeText(changes?.openConversations || 0),
+      changeType: getChangeType(changes?.openConversations || 0),
       icon: MessageCircle,
       color: "#59D8C3",
     },
     {
       id: 2,
       title: "در انتظار اولین پاسخ",
-      value: data.waitingForResponse,
-      change: "-۲ از دیروز",
-      changeType: "negative",
+      value: data.waitingForFirstResponse,
+      change: getChangeText(changes?.waitingForFirstResponse || 0),
+      changeType: getChangeType(changes?.waitingForFirstResponse || 0),
       icon: Clock,
       color: "#FF6B6B",
     },
@@ -37,8 +68,8 @@ export default function StatsCards({ data }: StatsCardsProps) {
       id: 3,
       title: "میانگین زمان پاسخ‌گویی",
       value: data.avgResponseTime,
-      change: "↓ ۳ دقیقه",
-      changeType: "negative",
+      change: "محاسبه شده از کل گفتگوها",
+      changeType: "neutral",
       icon: AlertCircle,
       color: "#F2B84B",
     },
@@ -46,12 +77,18 @@ export default function StatsCards({ data }: StatsCardsProps) {
       id: 4,
       title: "گفتگوهای حل‌شده امروز",
       value: data.solvedToday,
-      change: "+۵ از دیروز",
-      changeType: "positive",
+      change: getChangeText(changes?.solvedToday || 0),
+      changeType: getChangeType(changes?.solvedToday || 0),
       icon: CheckCircle,
       color: "#5BE0A8",
     },
   ];
+
+  const getChangeColor = (type: "positive" | "negative" | "neutral") => {
+    if (type === "positive") return "text-green-400 bg-[rgba(91,224,168,0.1)]";
+    if (type === "negative") return "text-red-400 bg-[rgba(255,107,107,0.1)]";
+    return "text-gray-400 bg-[rgba(255,255,255,0.05)]";
+  };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -68,11 +105,7 @@ export default function StatsCards({ data }: StatsCardsProps) {
               <stat.icon className="w-4 h-4 text-[#59D8C3]" />
             </div>
             <span
-              className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                stat.changeType === "positive"
-                  ? "text-green-400 bg-[rgba(91,224,168,0.1)]"
-                  : "text-red-400 bg-[rgba(255,107,107,0.1)]"
-              }`}
+              className={`text-xs font-medium px-2 py-0.5 rounded-full ${getChangeColor(stat.changeType)}`}
             >
               {stat.change}
             </span>

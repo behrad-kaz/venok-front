@@ -40,33 +40,51 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
       try {
         setIsLoading(true);
         
-        // 1. دریافت اطلاعات workspace (برای name, phone, email)
-        const workspaceId = localStorage.getItem("currentWorkspaceId");
-        let workspaceData = null;
+        // ✅ 1. دریافت workspace جاری از API
+        console.log('🔄 دریافت workspace جاری از API...');
+        let workspaceData;
         
-        if (workspaceId) {
-          console.log('🔄 دریافت اطلاعات workspace از API...');
+        try {
           workspaceData = await api.get<{ 
             id: number; 
             name: string; 
             phone: string | null; 
             email: string | null;
-          }>(`/workspace/${workspaceId}`);
-          console.log('📡 اطلاعات workspace دریافت شد:', workspaceData);
+          }>('/workspace/current');
+          console.log('📡 workspace جاری دریافت شد:', workspaceData);
+        } catch (error) {
+          console.warn('⚠️ خطا در دریافت workspace جاری، تلاش با ID موجود...', error);
+          const workspaceId = localStorage.getItem('currentWorkspaceId');
+          if (workspaceId) {
+            workspaceData = await api.get<{ 
+              id: number; 
+              name: string; 
+              phone: string | null; 
+              email: string | null;
+            }>(`/workspace/${workspaceId}`);
+          } else {
+            throw new Error('هیچ workspace ای یافت نشد');
+          }
         }
         
-        // 2. دریافت اطلاعات organization (برای logo, description, website)
+        // ✅ 2. دریافت اطلاعات organization
         console.log('🔄 دریافت اطلاعات organization از API...');
-        const orgData = await api.get<{ 
-          logo: string | null;
-          description: string | null;
-          website: string | null;
-          name?: string;
-          legalName?: string;
-        }>('/organization/current');
+        let orgData;
+        try {
+          orgData = await api.get<{ 
+            logo: string | null;
+            description: string | null;
+            website: string | null;
+            name?: string;
+            legalName?: string;
+          }>('/organization/current');
+        } catch (error) {
+          console.warn('⚠️ خطا در دریافت organization:', error);
+          orgData = { logo: null, description: null, website: null };
+        }
         console.log('📡 organization دریافت شد:', orgData);
         
-        // 3. به‌روزرسانی info با مقادیر
+        // ✅ 3. به‌روزرسانی info با مقادیر
         const updatedInfo: CompanyInfo = {
           ...info,
           name: workspaceData?.name || orgData?.name || '',
@@ -79,14 +97,20 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
         
         onInfoChange(updatedInfo);
         
-        // 4. تنظیم logoUrl برای نمایش
+        // ✅ 4. تنظیم logoUrl برای نمایش
         if (orgData?.logo) {
           setLogoUrl(orgData.logo);
           localStorage.setItem("companyLogo", orgData.logo);
         }
         
+        // ✅ 5. ذخیره workspaceId صحیح
+        if (workspaceData?.id) {
+          localStorage.setItem('currentWorkspaceId', String(workspaceData.id));
+        }
+        
       } catch (error) {
         console.error('❌ خطا در دریافت اطلاعات:', error);
+        showError("خطا در بارگذاری اطلاعات. لطفاً دوباره تلاش کنید.", "خطا");
       } finally {
         setIsLoading(false);
       }

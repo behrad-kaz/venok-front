@@ -18,28 +18,37 @@ export default function WorkspaceSupportTab({ info, onInfoChange }: WorkspaceSup
     const loadWorkspaceData = async () => {
       try {
         setIsLoading(true);
-        const workspaceId = localStorage.getItem("currentWorkspaceId");
         
-        if (!workspaceId) {
-          console.warn('⚠️ workspaceId یافت نشد');
-          return;
+        // ✅ دریافت workspace جاری از API
+        let workspaceData;
+        try {
+          workspaceData = await api.get<{ 
+            id: number; 
+            phone: string | null; 
+            email: string | null;
+          }>('/workspace/current');
+        } catch (error) {
+          console.warn('⚠️ خطا در دریافت workspace جاری، تلاش با ID موجود...', error);
+          const workspaceId = localStorage.getItem('currentWorkspaceId');
+          if (workspaceId) {
+            workspaceData = await api.get<{ 
+              id: number; 
+              phone: string | null; 
+              email: string | null;
+            }>(`/workspace/${workspaceId}`);
+          } else {
+            throw new Error('هیچ workspace ای یافت نشد');
+          }
         }
-
-        console.log('🔄 دریافت اطلاعات workspace از API برای SupportTab...');
-        const data = await api.get<{ 
-          id: number; 
-          phone: string | null; 
-          email: string | null;
-        }>(`/workspace/${workspaceId}`);
         
-        console.log('📡 اطلاعات workspace دریافت شد:', data);
+        console.log('📡 اطلاعات workspace دریافت شد:', workspaceData);
         
-        if (data) {
+        if (workspaceData) {
           // ✅ به‌روزرسانی supportInfo با مقادیر workspace
           onInfoChange({
             ...info,
-            phone: data.phone || '',
-            email: data.email || '',
+            phone: workspaceData.phone || '',
+            email: workspaceData.email || '',
           });
         }
       } catch (error) {

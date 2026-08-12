@@ -34,20 +34,28 @@ const persianToEnglishRole = (persianRole: UserRole): string => {
 interface RoleState {
   role: UserRole;
   setRole: (role: UserRole) => void;
+  // ✅ اضافه شده برای دریافت نقش از localStorage هنگام لود
+  loadRoleFromStorage: () => void;
 }
 
 export const useRoleStore = create<RoleState>()(
   persist(
     (set) => ({
-      role: "مدیر کل",
+      role: "کارمند", // مقدار پیش‌فرض
       setRole: (role) => {
         set({ role });
         localStorage.setItem("userRole", role);
-        // همچنین کوکی را به روز کنید
         const englishRole = persianToEnglishRole(role);
         document.cookie = `userRole=${englishRole}; path=/; max-age=${60 * 60 * 24 * 7}`;
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("roleChanged", { detail: role }));
+        }
+      },
+      loadRoleFromStorage: () => {
+        if (typeof window === "undefined") return;
+        const savedRole = localStorage.getItem("userRole") as UserRole | null;
+        if (savedRole && ["مدیر کل", "مدیر", "کارمند"].includes(savedRole)) {
+          set({ role: savedRole });
         }
       },
     }),

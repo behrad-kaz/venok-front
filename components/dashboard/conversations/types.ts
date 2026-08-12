@@ -1,3 +1,5 @@
+// components/dashboard/conversations/types.ts
+
 export interface Message {
   id: number;
   senderName: string;
@@ -5,7 +7,10 @@ export interface Message {
   time: string;
   isSupport: boolean;
   isInternal?: boolean;
-  senderType?: 'customer' | 'agent' | 'system';
+  senderType?: 'customer' | 'agent' | 'admin' | 'support' | 'system';
+  senderId?: number | null;
+  fileUrl?: string | null;
+  fileType?: string | null;
   createdAt?: string;
 }
 
@@ -14,6 +19,12 @@ export interface Conversation {
   customerName: string;
   customerInitial: string;
   customerPhone: string;
+  customerId?: number | null;
+  customer?: {
+    id: number;
+    name: string;
+    phone: string;
+  } | null;
   subject: string;
   lastMessage: string;
   time: string;
@@ -48,4 +59,5 @@ export interface AssignableEmployee {
   name: string;
   department: string;
   tickets: number;
+  role?: string;
 }

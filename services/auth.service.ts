@@ -1,5 +1,5 @@
 // services/auth.service.ts
-import { LoginResponseModel, StoredUserData, UserRolePersianType, UserRoleType, OrganizationModel, WorkspaceModel } from '@/types/auth.types';
+import { LoginResponseModel, StoredUserData, UserRolePersianType, UserRoleType, OrganizationModel, WorkspaceModel, LoginApiResponse } from '@/types/auth.types';
 import { api } from './api-client';
 
 // تعریف تایپ برای خطا
@@ -28,20 +28,6 @@ interface SwitchContextResponse {
   [key: string]: unknown;
 }
 
-// تعریف تایپ برای پاسخ لاگین جدید
-interface LoginResponse {
-  access_token: string;
-  user: {
-    id: number;
-    email: string;
-    mobile: string;
-    firstName: string;
-    lastName: string;
-    role: string;
-    avatar: string | null;
-  };
-}
-
 class AuthService {
   private static instance: AuthService;
   private readonly API_URL = 'http://localhost:3000';
@@ -55,63 +41,89 @@ class AuthService {
     return AuthService.instance;
   }
 
-  // تبدیل نقش انگلیسی به فارسی
-  private getPersianRole(role: string): UserRolePersianType {
-    const roleMap: Record<string, UserRolePersianType> = {
-      admin: 'مدیر کل',
-      moderator: 'مدیر',
-      user: 'کارمند',
-    };
-    return roleMap[role] || 'کارمند';
+  // ✅ تبدیل نقش انگلیسی به فارسی با پشتیبانی از staffRole
+  private getPersianRole(userRole: string, staffRole?: string | null): UserRolePersianType {
+    console.log('🔍 getPersianRole - userRole:', userRole, 'staffRole:', staffRole);
+    
+    // اگر نقش از سرور admin است
+    if (userRole === 'admin') {
+      return 'مدیر کل';
+    }
+
+    // اگر role === 'user' است، از staffRole استفاده کن
+    if (userRole === 'user' && staffRole) {
+      if (staffRole === 'department_manager') {
+        return 'مدیر';
+      }
+      if (staffRole === 'staff') {
+        return 'کارمند';
+      }
+    }
+
+    // fallback
+    return 'کارمند';
   }
 
-  // تعیین نقش بر اساس شماره تلفن (برای سازگاری با نسخه قبلی)
-  private determineRole(phone: string, username: string, serverRole?: string): { role: UserRoleType; rolePersian: UserRolePersianType } {
-    // اگر نقش از سرور آمده، از آن استفاده کن
-    if (serverRole) {
-      const roleMap: Record<string, UserRoleType> = {
-        admin: 'super_admin',
-        moderator: 'manager',
-        user: 'staff',
-      };
-      const role = roleMap[serverRole] || 'staff';
-      return { role, rolePersian: this.getPersianRole(serverRole) };
-    }
-
-    // fallback به روش قبلی
-    if (phone === '98920' || username === 'admin') {
+  // ✅ تعیین نقش با استفاده از userRole و staffRole
+  private determineRole(
+    userRole: string,
+    staffRole: string | null
+  ): { role: UserRoleType; rolePersian: UserRolePersianType } {
+    console.log('🔍 determineRole - userRole:', userRole, 'staffRole:', staffRole);
+    
+    // اگر admin است
+    if (userRole === 'admin') {
       return { role: 'super_admin', rolePersian: 'مدیر کل' };
     }
-    if (username === 'manager.support') {
-      return { role: 'manager', rolePersian: 'مدیر' };
+
+    // اگر user است، از staffRole استفاده کن
+    if (userRole === 'user' && staffRole) {
+      if (staffRole === 'department_manager') {
+        return { role: 'manager', rolePersian: 'مدیر' };
+      }
+      if (staffRole === 'staff') {
+        return { role: 'staff', rolePersian: 'کارمند' };
+      }
     }
+
+    // اگر user است اما staffRole وجود ندارد → کارمند
+    if (userRole === 'user' && !staffRole) {
+      console.log('⚠️ کاربر user است اما staffRole وجود ندارد → کارمند');
+      return { role: 'staff', rolePersian: 'کارمند' };
+    }
+
+    // fallback
     return { role: 'staff', rolePersian: 'کارمند' };
   }
 
-  // ✅ لاگین کاربر - ارسال فقط mobile و password
+  // ✅ لاگین کاربر - با دریافت staffId و staffRole از بک‌اند
   async login(username: string, password: string): Promise<LoginResponseModel> {
     console.log('📤 ارسال به سرور (POST /auth/login):', { username });
-    
-    // ✅ فقط mobile و password ارسال می‌شوند
+
     const loginData = {
-      mobile: username, // username همان شماره همراه است
+      mobile: username,
       password: password,
     };
-    
+
     console.log('📤 داده‌های ارسالی:', loginData);
-    
-    const response = await api.post<LoginResponse>('/auth/login', loginData);
-    
+
+    const response = await api.post<LoginApiResponse>('/auth/login', loginData);
+
     console.log('📥 پاسخ دریافتی:', response);
-    
-    // تبدیل پاسخ به فرمت مورد انتظار فرانت
+    console.log('📥 user.role از پاسخ:', response.user?.role);
+    console.log('📥 user.staffId از پاسخ:', response.user?.staffId);
+    console.log('📥 user.staffRole از پاسخ:', response.user?.staffRole);
+    console.log('📥 user.staffName از پاسخ:', response.user?.staffName);
+
+    // ✅ استفاده از userRole و staffRole
     const { role, rolePersian } = this.determineRole(
-      response.user.mobile || response.user.id.toString(),
-      username,
-      response.user.role
+      response.user.role || 'user',
+      response.user.staffRole || null
     );
 
-    // ساخت Organization و Workspace پیش‌فرض (از API بعداً دریافت می‌شود)
+    console.log('✅ نقش تعیین شده:', { role, rolePersian });
+
+    // ساخت Organization و Workspace پیش‌فرض
     const defaultOrganization: OrganizationModel = {
       id: 1,
       ownerUserId: response.user.id,
@@ -161,7 +173,7 @@ class AuthService {
     const loginResponse: LoginResponseModel = {
       token: {
         accessToken: response.access_token,
-        refreshToken: response.access_token, // فعلاً همان accessToken
+        refreshToken: response.access_token,
       },
       user: {
         id: response.user.id,
@@ -177,9 +189,16 @@ class AuthService {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         deletedAt: null,
+        role: rolePersian,
       },
       organizations: [defaultOrganization],
     };
+
+    // ✅ ذخیره اطلاعات staff برای استفاده بعدی
+    (loginResponse as any).staffId = response.user.staffId;
+    (loginResponse as any).staffRole = response.user.staffRole;
+    (loginResponse as any).staffName = response.user.staffName;
+    (loginResponse as any).rawRole = response.user.role;
 
     return loginResponse;
   }
@@ -187,16 +206,16 @@ class AuthService {
   // دریافت workspace و organization پیش‌فرض
   getDefaultContext(): DefaultContext | null {
     if (typeof window === 'undefined') return null;
-    
+
     const organizationsStr = localStorage.getItem("organizations");
     if (!organizationsStr) return null;
-    
+
     const organizations = JSON.parse(organizationsStr) as OrganizationModel[];
     const defaultOrganization = organizations[0];
     const defaultWorkspace = defaultOrganization?.workspaces?.[0] || null;
-    
+
     if (!defaultOrganization) return null;
-    
+
     return {
       organizationId: defaultOrganization.id,
       workspaceId: defaultWorkspace?.id || null,
@@ -219,7 +238,7 @@ class AuthService {
     localStorage.setItem("accessToken", token.accessToken);
     localStorage.setItem("refreshToken", token.refreshToken);
     localStorage.setItem("userToken", token.accessToken);
-    
+
     const maxAge = 60 * 60 * 24 * 7;
     document.cookie = `accessToken=${token.accessToken}; path=/; max-age=${maxAge}`;
   }
@@ -227,8 +246,23 @@ class AuthService {
   // ذخیره اطلاعات در localStorage و کوکی
   storeUserData(loginResponse: LoginResponseModel, username: string): StoredUserData {
     const { user, token, organizations } = loginResponse;
-    const { role, rolePersian } = this.determineRole(user.phone, username);
-    
+
+    // ✅ دریافت اطلاعات staff از response
+    const staffId = (loginResponse as any).staffId || null;
+    const staffRole = (loginResponse as any).staffRole || null;
+    const staffName = (loginResponse as any).staffName || null;
+    const rawRole = (loginResponse as any).rawRole || 'user';
+
+    console.log('📦 storeUserData - staffId:', staffId, 'staffRole:', staffRole, 'rawRole:', rawRole);
+
+    // ✅ تعیین نقش با استفاده از rawRole و staffRole
+    const { role, rolePersian } = this.determineRole(
+      rawRole,
+      staffRole
+    );
+
+    console.log('📦 storeUserData - نقش نهایی:', { role, rolePersian });
+
     const defaultOrganization = organizations[0];
     const defaultWorkspace = defaultOrganization?.workspaces?.[0];
 
@@ -244,6 +278,9 @@ class AuthService {
       userPhone: user.phone,
       currentOrganizationId: defaultOrganization?.id,
       currentWorkspaceId: defaultWorkspace?.id,
+      staffId: staffId || undefined,
+      staffRole: staffRole || undefined,
+      staffName: staffName || undefined,
     };
 
     // ذخیره در localStorage
@@ -259,6 +296,20 @@ class AuthService {
     localStorage.setItem('currentOrganization', JSON.stringify(defaultOrganization));
     localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
 
+    // ✅ ذخیره staffId و staffRole جداگانه
+    if (staffId) {
+      localStorage.setItem('staffId', String(staffId));
+    }
+    if (staffRole) {
+      localStorage.setItem('staffRole', staffRole);
+    }
+    if (staffName) {
+      localStorage.setItem('staffName', staffName);
+    }
+
+    // ✅ ذخیره نقش فارسی در localStorage
+    localStorage.setItem('userRole', rolePersian);
+
     const maxAge = 60 * 60 * 24 * 7;
     document.cookie = `isLoggedIn=true; path=/; max-age=${maxAge}`;
     document.cookie = `userRole=${role}; path=/; max-age=${maxAge}`;
@@ -266,7 +317,7 @@ class AuthService {
     document.cookie = `accessToken=${token.accessToken}; path=/; max-age=${maxAge}`;
     document.cookie = `userId=${user.id}; path=/; max-age=${maxAge}`;
     document.cookie = `userPhone=${user.phone}; path=/; max-age=${maxAge}`;
-    
+
     if (defaultOrganization?.id) {
       document.cookie = `organizationId=${defaultOrganization.id}; path=/; max-age=${maxAge}`;
     }
@@ -277,27 +328,30 @@ class AuthService {
     // Dispatch رویداد برای همگام‌سازی
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('authChange'));
+      window.dispatchEvent(new CustomEvent('roleChanged', { detail: rolePersian }));
     }
+
+    console.log('✅ storeUserData - نقش نهایی ذخیره شده:', rolePersian);
 
     return storedData;
   }
 
   // پردازش کامل بعد از لاگین
-  async processAfterLogin(username: string, password: string): Promise<{ 
-    success: boolean; 
-    hasWorkspace: boolean; 
+  async processAfterLogin(username: string, password: string): Promise<{
+    success: boolean;
+    hasWorkspace: boolean;
     redirectPath: string;
     error?: string;
   }> {
     try {
       const loginResponse = await this.login(username, password);
       console.log("✅ مرحله 1: لاگین موفق");
-      
-      this.storeUserData(loginResponse, username);
-      console.log("✅ مرحله 2: اطلاعات ذخیره شد");
-      
+
+      const storedData = this.storeUserData(loginResponse, username);
+      console.log("✅ مرحله 2: اطلاعات ذخیره شد - نقش:", storedData.userRole);
+
       const defaultContext = this.getDefaultContext();
-      
+
       if (!defaultContext) {
         return {
           success: false,
@@ -306,19 +360,19 @@ class AuthService {
           error: "اطلاعات سازمان یافت نشد"
         };
       }
-      
+
       console.log("✅ مرحله 3: context پیش‌فرض:", defaultContext);
-      
+
       try {
         const switchResult = await this.switchContext(defaultContext.organizationId, defaultContext.workspaceId || undefined);
         console.log("✅ مرحله 4: سوییچ context موفق");
-        
+
         if (switchResult?.contextToken) {
           localStorage.setItem("contextToken", switchResult.contextToken);
           localStorage.setItem("x-context-token", switchResult.contextToken);
           document.cookie = `contextToken=${switchResult.contextToken}; path=/; max-age=${60 * 60 * 24 * 7}`;
         }
-        
+
         if (switchResult?.access_token) {
           localStorage.setItem("accessToken", switchResult.access_token);
           localStorage.setItem("userToken", switchResult.access_token);
@@ -326,26 +380,26 @@ class AuthService {
       } catch (switchError) {
         console.warn("⚠️ سوییچ context با خطا مواجه شد:", switchError);
       }
-      
+
       const hasWorkspace = !!defaultContext.workspaceId;
       const redirectPath = hasWorkspace ? "/dashboard" : "/onboarding/workspace";
-      
-      console.log(`✅ مرحله 5: مسیر نهایی ${redirectPath}`);
-      
+
+      console.log(`✅ مرحله 5: مسیر نهایی ${redirectPath} - نقش: ${storedData.userRole}`);
+
       return {
         success: true,
         hasWorkspace,
         redirectPath
       };
-      
+
     } catch (error: unknown) {
       console.error("❌ خطا در processAfterLogin:", error);
-      
+
       let errorMessage = "خطا در پردازش درخواست";
       if (error && typeof error === 'object' && 'message' in error) {
         errorMessage = (error as { message: string }).message;
       }
-      
+
       return {
         success: false,
         hasWorkspace: false,
@@ -358,7 +412,7 @@ class AuthService {
   // دریافت اطلاعات کاربر ذخیره شده
   getStoredUserData(): Partial<StoredUserData> | null {
     if (typeof window === 'undefined') return null;
-    
+
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     if (!isLoggedIn) return null;
 
@@ -374,6 +428,9 @@ class AuthService {
       userPhone: localStorage.getItem('userPhone') || '',
       currentOrganizationId: Number(localStorage.getItem('currentOrganizationId')) || undefined,
       currentWorkspaceId: Number(localStorage.getItem('currentWorkspaceId')) || undefined,
+      staffId: Number(localStorage.getItem('staffId')) || undefined,
+      staffRole: localStorage.getItem('staffRole') || undefined,
+      staffName: localStorage.getItem('staffName') || undefined,
     };
   }
 
@@ -383,16 +440,17 @@ class AuthService {
       'isLoggedIn', 'hasSeenOnboarding', 'userRole', 'userRoleEnglish',
       'userName', 'userToken', 'refreshToken', 'userId', 'userPhone',
       'currentOrganizationId', 'currentWorkspaceId', 'accessToken',
-      'organizations', 'currentOrganization', 'currentWorkspace'
+      'organizations', 'currentOrganization', 'currentWorkspace',
+      'staffId', 'staffRole', 'staffName'
     ];
-    
+
     keysToRemove.forEach(key => localStorage.removeItem(key));
-    
+
     document.cookie.split(';').forEach(cookie => {
       const [name] = cookie.split('=');
       document.cookie = `${name.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
     });
-    
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('authChange'));
     }
@@ -442,14 +500,14 @@ class AuthService {
   updateCurrentContext(organizationId: number, workspaceId?: number): void {
     const organizations = this.getOrganizations();
     if (!organizations) return;
-    
+
     const organization = organizations.find((org: OrganizationModel) => org.id === organizationId);
     if (organization) {
       localStorage.setItem('currentOrganization', JSON.stringify(organization));
       localStorage.setItem('currentOrganizationId', String(organizationId));
       document.cookie = `organizationId=${organizationId}; path=/; max-age=${60 * 60 * 24 * 7}`;
     }
-    
+
     if (workspaceId && organization?.workspaces) {
       const workspace = organization.workspaces.find((ws: WorkspaceModel) => ws.id === workspaceId);
       if (workspace) {
@@ -459,6 +517,24 @@ class AuthService {
       }
     }
   }
+
+getStaffId(): number | null {
+  if (typeof window === 'undefined') return null;
+  const staffId = localStorage.getItem('staffId');
+  return staffId ? Number(staffId) : null;
+}
+
+// ✅ دریافت staffRole کاربر جاری
+getStaffRole(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('staffRole');
+}
+
+// ✅ دریافت staffName کاربر جاری
+getStaffName(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('staffName');
+}
 }
 
 export const authService = AuthService.getInstance();

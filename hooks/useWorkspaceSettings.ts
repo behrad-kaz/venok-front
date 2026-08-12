@@ -156,95 +156,144 @@ export function useWorkspaceSettings() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const workspaceId = localStorage.getItem("currentWorkspaceId");
-        if (!workspaceId) {
-          console.warn('⚠️ workspaceId یافت نشد');
-          showWarning("شناسه Workspace یافت نشد. لطفاً دوباره وارد شوید.", "خطا");
-          return;
-        }
-
-        console.log('🔄 دریافت اطلاعات workspace از API...');
-        const workspaceData = await api.get<{ 
-          id: number; 
-          name: string; 
-          phone: string | null; 
-          email: string | null;
-          supportPhone: string | null;
-          supportEmail: string | null;
-          alertPhone: string | null;
-          introText: string | null;
-          workingDays: {
-            saturday: boolean;
-            sunday: boolean;
-            monday: boolean;
-            tuesday: boolean;
-            wednesday: boolean;
-            thursday: boolean;
-            friday: boolean;
-          };
-          workStartTime: string;
-          workEndTime: string;
-          outOfHoursMessage: string | null;
-          sendLinkSms: boolean;
-          sendOtpForPasswordChange: boolean;
-          notifyManagerForUnanswered: boolean;
-          notifyNewConversations: boolean;
-          requireStrongPassword: boolean;
-          requirePhoneVerificationForPasswordChange: boolean;
-          autoLogoutMinutes: number;
-          logo: string | null;
-          timezone: string;
-          locale: string;
-        }>(`/workspace/${workspaceId}`);
+        // ✅ ابتدا workspace جاری را از API دریافت کن (نه از localStorage)
+        console.log('🔄 دریافت workspace جاری از API...');
+        let workspaceData;
         
-        console.log('📡 اطلاعات workspace دریافت شد:', workspaceData);
-
+        try {
+          workspaceData = await api.get<{ 
+            id: number; 
+            name: string; 
+            phone: string | null; 
+            email: string | null;
+            supportPhone: string | null;
+            supportEmail: string | null;
+            alertPhone: string | null;
+            introText: string | null;
+            workingDays: {
+              saturday: boolean;
+              sunday: boolean;
+              monday: boolean;
+              tuesday: boolean;
+              wednesday: boolean;
+              thursday: boolean;
+              friday: boolean;
+            };
+            workStartTime: string;
+            workEndTime: string;
+            outOfHoursMessage: string | null;
+            sendLinkSms: boolean;
+            sendOtpForPasswordChange: boolean;
+            notifyManagerForUnanswered: boolean;
+            notifyNewConversations: boolean;
+            requireStrongPassword: boolean;
+            requirePhoneVerificationForPasswordChange: boolean;
+            autoLogoutMinutes: number;
+            logo: string | null;
+            timezone: string;
+            locale: string;
+          }>('/workspace/current');
+          
+          console.log('📡 workspace جاری دریافت شد:', workspaceData);
+          
+          // ✅ ذخیره workspaceId صحیح در localStorage
+          if (workspaceData?.id) {
+            localStorage.setItem('currentWorkspaceId', String(workspaceData.id));
+            localStorage.setItem('currentWorkspace', JSON.stringify(workspaceData));
+          }
+          
+        } catch (error) {
+          console.warn('⚠️ خطا در دریافت workspace جاری، تلاش با ID پیش‌فرض...', error);
+          
+          // اگر خطا خورد، سعی کن با ID 1 دریافت کنی (برای مواقعی که کاربر workspace دارد)
+          const workspaceId = localStorage.getItem('currentWorkspaceId') || '1';
+          workspaceData = await api.get<{ 
+            id: number; 
+            name: string; 
+            phone: string | null; 
+            email: string | null;
+            supportPhone: string | null;
+            supportEmail: string | null;
+            alertPhone: string | null;
+            introText: string | null;
+            workingDays: {
+              saturday: boolean;
+              sunday: boolean;
+              monday: boolean;
+              tuesday: boolean;
+              wednesday: boolean;
+              thursday: boolean;
+              friday: boolean;
+            };
+            workStartTime: string;
+            workEndTime: string;
+            outOfHoursMessage: string | null;
+            sendLinkSms: boolean;
+            sendOtpForPasswordChange: boolean;
+            notifyManagerForUnanswered: boolean;
+            notifyNewConversations: boolean;
+            requireStrongPassword: boolean;
+            requirePhoneVerificationForPasswordChange: boolean;
+            autoLogoutMinutes: number;
+            logo: string | null;
+            timezone: string;
+            locale: string;
+          }>(`/workspace/${workspaceId}`);
+        }
+        
+        // ✅ دریافت اطلاعات organization
         console.log('🔄 دریافت اطلاعات organization از API...');
-        const orgData = await api.get<{ 
-          logo: string | null;
-          description: string | null;
-          website: string | null;
-        }>('/organization/current');
+        let orgData;
+        try {
+          orgData = await api.get<{ 
+            logo: string | null;
+            description: string | null;
+            website: string | null;
+          }>('/organization/current');
+        } catch (error) {
+          console.warn('⚠️ خطا در دریافت organization:', error);
+          orgData = { logo: null, description: null, website: null };
+        }
         console.log('📡 organization دریافت شد:', orgData);
 
-        const logoUrl = getFullImageUrl(workspaceData.logo || orgData.logo);
+        const logoUrl = getFullImageUrl(workspaceData?.logo || orgData?.logo);
         
         const newCompanyInfo: CompanyInfo = {
-          name: workspaceData.name || '',
-          domain: orgData.website || '',
-          description: orgData.description || '',
+          name: workspaceData?.name || '',
+          domain: orgData?.website || '',
+          description: orgData?.description || '',
           logo: logoUrl,
-          phone: workspaceData.phone || '',
-          email: workspaceData.email || '',
+          phone: workspaceData?.phone || '',
+          email: workspaceData?.email || '',
           logoFile: null,
         };
 
         const newSupportInfo: SupportInfo = {
-          phone: workspaceData.supportPhone || workspaceData.phone || '',
-          email: workspaceData.supportEmail || workspaceData.email || '',
-          alertPhone: workspaceData.alertPhone || '',
-          introText: workspaceData.introText || '',
+          phone: workspaceData?.supportPhone || workspaceData?.phone || '',
+          email: workspaceData?.supportEmail || workspaceData?.email || '',
+          alertPhone: workspaceData?.alertPhone || '',
+          introText: workspaceData?.introText || '',
         };
 
         const newWorkingHours: WorkingHours = {
-          workingDays: workspaceData.workingDays || initialWorkingHours.workingDays,
-          startTime: workspaceData.workStartTime || initialWorkingHours.startTime,
-          endTime: workspaceData.workEndTime || initialWorkingHours.endTime,
-          timezone: workspaceData.timezone || initialWorkingHours.timezone,
-          outOfHoursMessage: workspaceData.outOfHoursMessage || initialWorkingHours.outOfHoursMessage,
+          workingDays: workspaceData?.workingDays || initialWorkingHours.workingDays,
+          startTime: workspaceData?.workStartTime || initialWorkingHours.startTime,
+          endTime: workspaceData?.workEndTime || initialWorkingHours.endTime,
+          timezone: workspaceData?.timezone || initialWorkingHours.timezone,
+          outOfHoursMessage: workspaceData?.outOfHoursMessage || initialWorkingHours.outOfHoursMessage,
         };
 
         const newNotificationSettings: NotificationSettings = {
-          sendLinkSms: workspaceData.sendLinkSms !== undefined ? workspaceData.sendLinkSms : initialNotificationSettings.sendLinkSms,
-          sendOtpForPasswordChange: workspaceData.sendOtpForPasswordChange !== undefined ? workspaceData.sendOtpForPasswordChange : initialNotificationSettings.sendOtpForPasswordChange,
-          notifyManagerForUnanswered: workspaceData.notifyManagerForUnanswered !== undefined ? workspaceData.notifyManagerForUnanswered : initialNotificationSettings.notifyManagerForUnanswered,
-          notifyNewConversations: workspaceData.notifyNewConversations !== undefined ? workspaceData.notifyNewConversations : initialNotificationSettings.notifyNewConversations,
+          sendLinkSms: workspaceData?.sendLinkSms !== undefined ? workspaceData.sendLinkSms : initialNotificationSettings.sendLinkSms,
+          sendOtpForPasswordChange: workspaceData?.sendOtpForPasswordChange !== undefined ? workspaceData.sendOtpForPasswordChange : initialNotificationSettings.sendOtpForPasswordChange,
+          notifyManagerForUnanswered: workspaceData?.notifyManagerForUnanswered !== undefined ? workspaceData.notifyManagerForUnanswered : initialNotificationSettings.notifyManagerForUnanswered,
+          notifyNewConversations: workspaceData?.notifyNewConversations !== undefined ? workspaceData.notifyNewConversations : initialNotificationSettings.notifyNewConversations,
         };
 
         const newSecuritySettings: SecuritySettings = {
-          requireStrongPassword: workspaceData.requireStrongPassword !== undefined ? workspaceData.requireStrongPassword : initialSecuritySettings.requireStrongPassword,
-          requirePhoneVerificationForPasswordChange: workspaceData.requirePhoneVerificationForPasswordChange !== undefined ? workspaceData.requirePhoneVerificationForPasswordChange : initialSecuritySettings.requirePhoneVerificationForPasswordChange,
-          autoLogoutMinutes: workspaceData.autoLogoutMinutes || initialSecuritySettings.autoLogoutMinutes,
+          requireStrongPassword: workspaceData?.requireStrongPassword !== undefined ? workspaceData.requireStrongPassword : initialSecuritySettings.requireStrongPassword,
+          requirePhoneVerificationForPasswordChange: workspaceData?.requirePhoneVerificationForPasswordChange !== undefined ? workspaceData.requirePhoneVerificationForPasswordChange : initialSecuritySettings.requirePhoneVerificationForPasswordChange,
+          autoLogoutMinutes: workspaceData?.autoLogoutMinutes || initialSecuritySettings.autoLogoutMinutes,
         };
 
         setCompanyInfo(newCompanyInfo);
@@ -344,11 +393,20 @@ export function useWorkspaceSettings() {
         return;
       }
 
-      const workspaceId = localStorage.getItem("currentWorkspaceId");
-      if (!workspaceId) {
-        showError("شناسه workspace یافت نشد", "خطا");
-        setIsSaving(false);
-        return;
+      // ✅ دریافت workspaceId از API به جای localStorage
+      let workspaceId;
+      try {
+        const currentWorkspace = await api.get<{ id: number }>('/workspace/current');
+        workspaceId = currentWorkspace.id;
+      } catch (error) {
+        const savedId = localStorage.getItem('currentWorkspaceId');
+        if (savedId) {
+          workspaceId = savedId;
+        } else {
+          showError("شناسه workspace یافت نشد", "خطا");
+          setIsSaving(false);
+          return;
+        }
       }
 
       const slug = generateSlug(companyInfo.name);
