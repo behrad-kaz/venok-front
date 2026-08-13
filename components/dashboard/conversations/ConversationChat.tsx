@@ -224,41 +224,10 @@ export default function ConversationChat({
         messageText = fileContent;
       }
 
-      if (socketRef?.current?.connected) {
-        socketRef.current.emit("send_message", {
-          conversationId: String(conversation.id),
-          text: messageText,
-          isInternal: false,
-          senderName: currentUser?.userName || "پشتیبانی",
-          senderType: "agent",
-        });
-
-        // ✅ پیام را به صورت محلی اضافه کن با isOwnMessage
-        const newMsg = {
-          id: Date.now(),
-          senderName: currentUser?.userName || "شما",
-          text: messageText,
-          time: new Date().toLocaleTimeString("fa-IR"),
-          isSupport: true,
-          isInternal: false,
-          senderType: "agent",
-          senderId: currentUser?.staffId || null,
-          createdAt: new Date().toISOString(),
-          isOwnMessage: true,
-        };
-
-        await onSendMessage(messageText);
-        setSelectedFile(null);
-        setFilePreview(null);
-        onNewMessageChange("");
-        showSuccess("فایل با موفقیت ارسال شد");
-      } else {
-        console.error("❌ Socket متصل نیست، فایل ارسال نشد");
-        showError("اتصال به سرور برقرار نیست. لطفاً دوباره تلاش کنید.");
-        setIsUploading(false);
-        setIsSending(false);
-        return;
-      }
+      await onSendMessage(messageText);
+      setSelectedFile(null);
+      setFilePreview(null);
+      onNewMessageChange("");
     } catch (error) {
       console.error("❌ خطا در ارسال فایل:", error);
       showError("خطا در ارسال فایل");
@@ -281,25 +250,8 @@ export default function ConversationChat({
     setIsSending(true);
 
     try {
-      if (socketRef?.current?.connected) {
-        console.log("📤 ارسال پیام از طریق Socket:", messageToSend);
-        socketRef.current.emit("send_message", {
-          conversationId: String(conversation.id),
-          text: messageToSend,
-          isInternal: false,
-          senderName: currentUser?.userName || "پشتیبانی",
-          senderType: "agent",
-        });
-
-        // ✅ فقط UI را به‌روز کن (onSendMessage خودش پیام را اضافه می‌کند)
-        onSendMessage(messageToSend);
-        onNewMessageChange("");
-
-        showSuccess("پیام با موفقیت ارسال شد");
-      } else {
-        console.error("❌ Socket متصل نیست، پیام ارسال نشد");
-        showError("اتصال به سرور برقرار نیست. لطفاً دوباره تلاش کنید.");
-      }
+      await onSendMessage(messageToSend);
+      onNewMessageChange("");
     } catch (error) {
       console.error("❌ خطا در ارسال پیام:", error);
       showError("خطا در ارسال پیام");

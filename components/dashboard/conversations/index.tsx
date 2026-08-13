@@ -45,9 +45,6 @@ export default function ConversationsContainer() {
   const isInitialized = useRef(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
-  
-  // ✅ لیست ID پیام‌های در حال ارسال (برای جلوگیری از تکراری)
-  const pendingMessageIds = useRef<Set<string>>(new Set());
 
   const isAdmin = role === "مدیر کل";
   const isManager = role === "مدیر";
@@ -91,13 +88,6 @@ export default function ConversationsContainer() {
     const convId = typeof message.conversationId === "string" 
       ? parseInt(message.conversationId) 
       : message.conversationId;
-
-    // ✅ اگر پیام در حال ارسال است (pending)، نادیده بگیر
-    if (pendingMessageIds.current.has(msgId)) {
-      console.log("ℹ️ پیام در حال ارسال، نادیده گرفته شد:", msgId);
-      pendingMessageIds.current.delete(msgId);
-      return;
-    }
 
     // ✅ اگر پیام قبلاً در UI وجود دارد، نادیده بگیر
     let exists = false;
@@ -494,11 +484,6 @@ export default function ConversationsContainer() {
 
       try {
         if (isConnected && socketRef.current) {
-          // ✅ تولید ID یکتا برای پیام
-          const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-          pendingMessageIds.current.add(tempId);
-
-          // ✅ ارسال از طریق Socket
           socketRef.current.emit("send_message", {
             conversationId: selectedConversation.id.toString(),
             text: message,
@@ -507,62 +492,6 @@ export default function ConversationsContainer() {
             senderType: "agent",
           });
 
-          // ✅ پیام را به صورت محلی اضافه کن
-          const newMsg = {
-            id: tempId,
-            senderName: currentUser?.userName || "شما",
-            text: message,
-            time: new Date().toLocaleTimeString("fa-IR"),
-            isSupport: true,
-            isInternal: false,
-            senderType: "agent",
-            senderId: currentUser?.staffId || null,
-            createdAt: new Date().toISOString(),
-          };
-
-          setConversations((prev) =>
-            prev.map((conv) => {
-              if (conv.id === selectedConversation.id) {
-                const updatedMessages = [...conv.messages, newMsg].sort(
-                  (a, b) => {
-                    const dateA = a.createdAt
-                      ? new Date(a.createdAt).getTime()
-                      : 0;
-                    const dateB = b.createdAt
-                      ? new Date(b.createdAt).getTime()
-                      : 0;
-                    return dateA - dateB;
-                  },
-                );
-
-                return {
-                  ...conv,
-                  messages: updatedMessages,
-                  lastMessage: message,
-                  time: "همین الان",
-                };
-              }
-              return conv;
-            }),
-          );
-
-          setSelectedConversation((prev) => {
-            if (!prev) return prev;
-            const updatedMessages = [...prev.messages, newMsg].sort((a, b) => {
-              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return dateA - dateB;
-            });
-
-            return {
-              ...prev,
-              messages: updatedMessages,
-              lastMessage: message,
-              time: "همین الان",
-            };
-          });
-
-          setNewMessage("");
           showSuccess("پیام با موفقیت ارسال شد");
         } else {
           console.error("❌ Socket متصل نیست، پیام ارسال نشد");
