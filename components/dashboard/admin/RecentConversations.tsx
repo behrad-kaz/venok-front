@@ -3,6 +3,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { memo } from "react";
 
 interface Conversation {
   id: number;
@@ -76,7 +77,7 @@ const getStatusBadge = (status: Conversation["status"]) => {
   }
 };
 
-export default function RecentConversations() {
+function RecentConversationsComponent() {
   return (
     <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
       <div className="flex items-center justify-between mb-4">
@@ -135,3 +136,6 @@ export default function RecentConversations() {
     </div>
   );
 }
+
+// ✅ استفاده از memo برای جلوگیری از رندر مجدد
+export default memo(RecentConversationsComponent);

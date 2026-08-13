@@ -3,6 +3,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { memo } from "react";
 
 interface Department {
   id: number;
@@ -20,7 +21,7 @@ const departments: Department[] = [
   { id: 4, name: "پیگیری سفارش", openConversations: 3, activeMembers: 2, avgResponseTime: "۱۰ دقیقه", status: "normal" },
 ];
 
-export default function DepartmentsTable() {
+function DepartmentsTableComponent() {
   return (
     <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] overflow-hidden">
       <div className="p-5 border-b border-[rgba(255,255,255,0.1)]">
@@ -98,3 +99,6 @@ export default function DepartmentsTable() {
     </div>
   );
 }
+
+// ✅ استفاده از memo برای جلوگیری از رندر مجدد
+export default memo(DepartmentsTableComponent);

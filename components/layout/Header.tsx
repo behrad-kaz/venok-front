@@ -12,10 +12,15 @@ import {
   UserCircle,
   Settings,
   Menu,
+  AlertTriangle,
+  Info,
+  AlertCircle,
 } from "lucide-react";
 import { useRoleStore, UserRole } from "@/stores/useRoleStore";
 import { authService } from "@/services/auth.service";
 import { api } from "@/services/api-client";
+import { useNotifications } from "@/hooks/useNotifications";
+import Link from "next/link";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -44,26 +49,46 @@ const getPageTitle = (pathname: string): string => {
   return "داشبورد";
 };
 
-// نقش‌ها و نمایش فارسی آنها
 const roleDisplayMap: Record<string, string> = {
   admin: "مدیر کل",
   moderator: "مدیر",
   user: "کارمند",
 };
 
-// نقش انگلیسی به فارسی
 const getRolePersian = (role: string): string => {
   return roleDisplayMap[role] || role;
+};
+
+const getNotificationIcon = (type: string) => {
+  switch (type) {
+    case 'warning':
+      return <AlertTriangle className="w-4 h-4 text-[#F2B84B]" />;
+    case 'danger':
+      return <AlertCircle className="w-4 h-4 text-red-400" />;
+    default:
+      return <Info className="w-4 h-4 text-[#59D8C3]" />;
+  }
+};
+
+const getNotificationColor = (type: string) => {
+  switch (type) {
+    case 'warning':
+      return 'bg-[#F2B84B]';
+    case 'danger':
+      return 'bg-red-400';
+    default:
+      return 'bg-[#59D8C3]';
+  }
 };
 
 export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { role: selectedRole, setRole: setSelectedRole } = useRoleStore();
+  const { notifications, unreadCount, totalCount, markAsRead, markAllAsRead } = useNotifications();
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [hasNotification, setHasNotification] = useState(true);
   
   const [isClient, setIsClient] = useState(false);
   const [userInfo, setUserInfo] = useState<UserFullInfo>({
@@ -81,25 +106,15 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
       try {
         setIsLoading(true);
         
-        // 1. دریافت اطلاعات کاربر از localStorage
         const userName = localStorage.getItem("userName") || "کاربر";
         const userRole = localStorage.getItem("userRole") as UserRole || "کارمند";
         const staffId = authService.getStaffId();
         const staffRole = authService.getStaffRole();
         const staffName = authService.getStaffName();
 
-        console.log('📌 اطلاعات کاربر از localStorage:', {
-          userName,
-          userRole,
-          staffId,
-          staffRole,
-          staffName,
-        });
-
         let departmentName = "";
         let displayRole = userRole;
 
-        // 2. اگر staffId وجود دارد، اطلاعات کامل staff را دریافت کن
         if (staffId) {
           try {
             const staffResponse = await api.get<{
@@ -107,21 +122,13 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
               name: string;
               role: string;
               departmentId: number | null;
-              department?: {
-                id: number;
-                name: string;
-                color: string;
-              };
+              department?: { id: number; name: string; color: string };
             }>(`/staff/${staffId}`);
 
-            console.log('📌 اطلاعات staff از API:', staffResponse);
-
-            // دریافت نام دپارتمان
             if (staffResponse.department?.name) {
               departmentName = staffResponse.department.name;
             }
 
-            // تعیین نقش نمایشی مناسب
             const roleEnglish = staffResponse.role || staffRole || 'staff';
             
             if (roleEnglish === 'department_manager') {
@@ -134,7 +141,6 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
               displayRole = getRolePersian(roleEnglish);
             }
 
-            // اگر staffName وجود دارد از آن استفاده کن، وگرنه از userName
             const finalName = staffResponse.name || staffName || userName;
 
             setUserInfo({
@@ -145,16 +151,8 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
               avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=${encodeURIComponent(finalName)}&length=2&font-size=0.24&size=40`,
             });
 
-            console.log('✅ اطلاعات کاربر به‌روزرسانی شد:', {
-              name: finalName,
-              role: roleEnglish,
-              roleDisplay: displayRole,
-              departmentName,
-            });
-
           } catch (staffError) {
             console.error('❌ خطا در دریافت اطلاعات staff:', staffError);
-            // fallback به اطلاعات localStorage
             setUserInfo({
               name: userName,
               role: userRole,
@@ -164,7 +162,6 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
             });
           }
         } else {
-          // اگر staffId وجود نداشت، از اطلاعات localStorage استفاده کن
           setUserInfo({
             name: userName,
             role: userRole,
@@ -174,7 +171,6 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
           });
         }
 
-        // همگام‌سازی نقش با store
         const savedRole = localStorage.getItem("userRole") as UserRole | null;
         if (savedRole && savedRole !== selectedRole) {
           setSelectedRole(savedRole);
@@ -182,7 +178,6 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
 
       } catch (error) {
         console.error('❌ خطا در بارگذاری اطلاعات کاربر:', error);
-        // fallback
         const userName = localStorage.getItem("userName") || "کاربر";
         const userRole = localStorage.getItem("userRole") as UserRole || "کارمند";
         setUserInfo({
@@ -201,7 +196,6 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
     fetchUserInfo();
   }, [selectedRole, setSelectedRole]);
 
-  // ✅ گوش دادن به تغییرات نقش
   useEffect(() => {
     const handleRoleChange = () => {
       const userName = localStorage.getItem("userName") || "کاربر";
@@ -209,7 +203,6 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
       const staffId = authService.getStaffId();
       
       if (staffId) {
-        // دوباره اطلاعات را دریافت کن
         const fetchStaffAgain = async () => {
           try {
             const staffResponse = await api.get<{
@@ -286,7 +279,6 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
 
   if (!isDashboardPage) return null;
 
-  // نمایش لودینگ
   if (isLoading || !isClient) {
     return (
       <header className="bg-[#0D1B17] border-b border-[#59D8C3]/20 sticky top-0 z-40 backdrop-blur-sm">
@@ -316,35 +308,107 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* ✅ بخش نوتیفیکیشن با داده‌های داینامیک */}
             <div className="relative">
-              <button onClick={() => { setIsNotificationOpen(!isNotificationOpen); if (hasNotification) setHasNotification(false); }} className="relative transition-colors rounded-lg p-2">
+              <button
+                onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                className="relative transition-colors rounded-lg p-2 hover:bg-[rgba(255,255,255,0.05)]"
+              >
                 <Bell className="w-5 h-5 text-gray-300" />
-                {hasNotification && <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#F2B84B] text-[0.65rem] text-black text-center rounded-full animate-pulse flex items-center justify-center">3</span>}
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#F2B84B] text-[0.65rem] text-black text-center rounded-full animate-pulse flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
 
               <AnimatePresence>
                 {isNotificationOpen && (
-                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute left-0 top-12 w-80 bg-[#11241fd3] border border-[#59D8C3]/20 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute left-0 top-12 w-80 max-h-[500px] overflow-y-auto bg-[#11241fd3] border border-[#59D8C3]/20 rounded-2xl shadow-2xl z-50"
+                  >
                     <div className="p-4">
-                      <p className="text-sm font-semibold text-white mb-3">اعلان‌ها</p>
-                      <div className="space-y-2">
-                        <div className="flex gap-3 py-2.5 border-b border-[#59D8C3]/10 last:border-0">
-                          <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#F2B84B]" />
-                          <div>
-                            <p className="text-xs text-white">تیکت جدید از رضا احمدی</p>
-                            <p className="text-[10px] text-gray-500 mt-0.5">۵ دقیقه پیش</p>
-                          </div>
-                        </div>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-semibold text-white">اعلان‌ها</p>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={markAllAsRead}
+                            className="text-xs text-[#59D8C3] hover:text-[#6ef3dc] transition-colors"
+                          >
+                            همه را خوانده شد
+                          </button>
+                        )}
                       </div>
+
+                      {notifications.length === 0 ? (
+                        <div className="text-center py-6">
+                          <p className="text-sm text-gray-500">هیچ اعلانی وجود ندارد</p>
+                          <p className="text-xs text-gray-600 mt-1">همه چیز خوب است! 🎉</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {notifications.slice(0, 10).map((notification) => (
+                            <div
+                              key={notification.id}
+                              className={`flex gap-3 py-2.5 border-b border-[#59D8C3]/10 last:border-0 ${
+                                !notification.isRead ? 'bg-[rgba(89,216,195,0.05)] rounded-lg px-2' : ''
+                              }`}
+                              onClick={() => markAsRead(notification.id)}
+                            >
+                              <div
+                                className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${getNotificationColor(notification.type)}`}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {getNotificationIcon(notification.type)}
+                                  <p className="text-xs text-white font-medium truncate">
+                                    {notification.title}
+                                  </p>
+                                </div>
+                                <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-2">
+                                  {notification.description}
+                                </p>
+                                <Link
+                                  href={notification.buttonLink}
+                                  className="text-[10px] text-[#59D8C3] hover:text-[#6ef3dc] transition-colors mt-1 inline-block"
+                                  onClick={() => {
+                                    markAsRead(notification.id);
+                                    setIsNotificationOpen(false);
+                                  }}
+                                >
+                                  {notification.buttonText} ←
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {notifications.length > 10 && (
+                        <div className="text-center mt-3 pt-2 border-t border-[rgba(255,255,255,0.05)]">
+                          <Link
+                            href="/dashboard/notifications"
+                            className="text-xs text-gray-500 hover:text-white transition-colors"
+                          >
+                            مشاهده همه {totalCount} اعلان
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-            {/* ✅ بخش پروفایل با نام و نقش کامل */}
+            {/* بخش پروفایل */}
             <div className="relative">
-              <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center gap-3 hover:bg-[#1A352B] transition-colors rounded-lg px-3 py-2">
+              <button
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                className="flex items-center gap-3 hover:bg-[#1A352B] transition-colors rounded-lg px-3 py-2"
+              >
                 <img src={userInfo.avatar} alt={userInfo.name} className="w-8 h-8 rounded-full object-cover border-2 border-[#59D8C3]" />
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-white truncate max-w-[120px]">
@@ -359,7 +423,12 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
 
               <AnimatePresence>
                 {isProfileMenuOpen && (
-                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-full left-0 mt-2 w-64 bg-[#0D1B17] border border-[#59D8C3]/20 rounded-lg overflow-hidden shadow-xl z-50">
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-0 mt-2 w-64 bg-[#0D1B17] border border-[#59D8C3]/20 rounded-lg overflow-hidden shadow-xl z-50"
+                  >
                     <div className="px-4 py-3 border-b border-[#59D8C3]/10">
                       <div className="flex items-center gap-3">
                         <img src={userInfo.avatar} alt={userInfo.name} className="w-10 h-10 rounded-full object-cover border-2 border-[#59D8C3]" />

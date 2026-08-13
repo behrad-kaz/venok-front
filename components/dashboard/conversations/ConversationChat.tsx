@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect, useRef } from "react";
 import {
@@ -53,6 +53,7 @@ interface ConversationChatProps {
   isAdmin?: boolean;
   isManager?: boolean;
   departmentName?: string;
+  currentUser?: any; // ✅ اضافه شد
 }
 
 export default function ConversationChat({
@@ -74,6 +75,7 @@ export default function ConversationChat({
   isAdmin = false,
   isManager = false,
   departmentName = "",
+  currentUser, // ✅ اضافه شد
 }: ConversationChatProps) {
   const { showSuccess, showError, showConfirm } = useModal();
   const badge = getStatusBadge(conversation.status);
@@ -148,20 +150,16 @@ export default function ConversationChat({
       ? assignableEmployees
       : [];
 
-    // ✅ اگر مدیر کل است، همه کارمندان را نمایش بده
     if (isAdmin) {
       console.log("👑 [Chat] مدیر کل: نمایش همه کارمندان برای تخصیص");
       return employees;
     }
 
-    // ✅ اگر مدیر دپارتمان است، فقط کارمندان دپارتمان خودش را نمایش بده
     if (isManager) {
       const filtered = employees.filter((emp) => {
-        // اگر کارمند دپارتمان ندارد، به مدیر دپارتمان نشان بده
         if (!emp.department || emp.department === "بدون دپارتمان") {
           return true;
         }
-        // اگر دپارتمان کارمند با دپارتمان مدیر مطابقت دارد
         return emp.department === departmentName;
       });
       console.log(
@@ -173,7 +171,6 @@ export default function ConversationChat({
     return [];
   };
 
-  // ✅ لیست فیلتر شده برای دراپ‌دان
   const filteredEmployees = getFilteredEmployeesForDropdown();
 
   // ✅ آپلود فایل
@@ -197,7 +194,7 @@ export default function ConversationChat({
     }
   };
 
-  // ✅ ارسال پیام با فایل (ترکیب متن کاربر و فایل)
+  // ✅ اصلاح نهایی: فقط Socket با isOwnMessage
   const handleSendWithFile = async () => {
     if (!selectedFile || isSending || isUploading) return;
 
@@ -205,10 +202,8 @@ export default function ConversationChat({
     setIsSending(true);
 
     try {
-      // 1. آپلود فایل
       const filePath = await uploadFile(selectedFile);
 
-      // 2. ساخت محتوای فایل
       const isImage = selectedFile.type.startsWith("image/");
       let fileContent = "";
 
@@ -220,7 +215,6 @@ export default function ConversationChat({
         fileContent = `📎 **${fileName}** (${fileSize} KB)\n${filePath}`;
       }
 
-      // ✅ 3. ترکیب متن کاربر و محتوای فایل
       const userText = newMessage.trim();
       let messageText = "";
 
@@ -230,23 +224,41 @@ export default function ConversationChat({
         messageText = fileContent;
       }
 
-      // 4. ارسال پیام از طریق Socket
       if (socketRef?.current?.connected) {
         socketRef.current.emit("send_message", {
           conversationId: String(conversation.id),
           text: messageText,
           isInternal: false,
+          senderName: currentUser?.userName || "پشتیبانی",
+          senderType: "agent",
         });
+
+        // ✅ پیام را به صورت محلی اضافه کن با isOwnMessage
+        const newMsg = {
+          id: Date.now(),
+          senderName: currentUser?.userName || "شما",
+          text: messageText,
+          time: new Date().toLocaleTimeString("fa-IR"),
+          isSupport: true,
+          isInternal: false,
+          senderType: "agent",
+          senderId: currentUser?.staffId || null,
+          createdAt: new Date().toISOString(),
+          isOwnMessage: true,
+        };
+
+        await onSendMessage(messageText);
+        setSelectedFile(null);
+        setFilePreview(null);
+        onNewMessageChange("");
+        showSuccess("فایل با موفقیت ارسال شد");
+      } else {
+        console.error("❌ Socket متصل نیست، فایل ارسال نشد");
+        showError("اتصال به سرور برقرار نیست. لطفاً دوباره تلاش کنید.");
+        setIsUploading(false);
+        setIsSending(false);
+        return;
       }
-
-      await onSendMessage(messageText);
-
-      // 5. پاک کردن فایل انتخاب شده و پیام
-      setSelectedFile(null);
-      setFilePreview(null);
-      onNewMessageChange("");
-
-      showSuccess("فایل با موفقیت ارسال شد");
     } catch (error) {
       console.error("❌ خطا در ارسال فایل:", error);
       showError("خطا در ارسال فایل");
@@ -256,9 +268,8 @@ export default function ConversationChat({
     }
   };
 
-  // ✅ ارسال پیام متنی
+  // ✅ اصلاح: فقط Socket بدون اضافه کردن مجدد به UI
   const handleSend = async () => {
-    // اگر فایل انتخاب شده باشد، از متد ارسال با فایل استفاده کن
     if (selectedFile) {
       await handleSendWithFile();
       return;
@@ -271,15 +282,24 @@ export default function ConversationChat({
 
     try {
       if (socketRef?.current?.connected) {
+        console.log("📤 ارسال پیام از طریق Socket:", messageToSend);
         socketRef.current.emit("send_message", {
           conversationId: String(conversation.id),
           text: messageToSend,
           isInternal: false,
+          senderName: currentUser?.userName || "پشتیبانی",
+          senderType: "agent",
         });
-      }
 
-      await onSendMessage(messageToSend);
-      onNewMessageChange("");
+        // ✅ فقط UI را به‌روز کن (onSendMessage خودش پیام را اضافه می‌کند)
+        onSendMessage(messageToSend);
+        onNewMessageChange("");
+
+        showSuccess("پیام با موفقیت ارسال شد");
+      } else {
+        console.error("❌ Socket متصل نیست، پیام ارسال نشد");
+        showError("اتصال به سرور برقرار نیست. لطفاً دوباره تلاش کنید.");
+      }
     } catch (error) {
       console.error("❌ خطا در ارسال پیام:", error);
       showError("خطا در ارسال پیام");
@@ -288,6 +308,7 @@ export default function ConversationChat({
     }
   };
 
+  
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -295,12 +316,10 @@ export default function ConversationChat({
     }
   };
 
-  // ✅ انتخاب فایل
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // محدودیت حجم: 10MB
     if (file.size > 10 * 1024 * 1024) {
       showError("حجم فایل نباید بیشتر از ۱۰ مگابایت باشد");
       return;
@@ -308,7 +327,6 @@ export default function ConversationChat({
 
     setSelectedFile(file);
 
-    // اگر عکس است، پیش‌نمایش ایجاد کن
     if (file.type.startsWith("image/")) {
       const reader = new FileReader();
       reader.onload = () => {
@@ -319,11 +337,9 @@ export default function ConversationChat({
       setFilePreview(null);
     }
 
-    // ریست کردن input
     e.target.value = "";
   };
 
-  // ✅ حذف فایل انتخاب شده
   const removeSelectedFile = () => {
     setSelectedFile(null);
     setFilePreview(null);
@@ -375,6 +391,7 @@ export default function ConversationChat({
   ];
 
   const isMessageFromSupport = (msg: any): boolean => {
+    // 1️⃣ بررسی senderType
     if (msg.senderType) {
       if (
         msg.senderType === "agent" ||
@@ -388,33 +405,53 @@ export default function ConversationChat({
       }
     }
 
+    // 2️⃣ بررسی isSupport
     if (msg.isSupport !== undefined) {
       return msg.isSupport === true;
     }
 
+    // 3️⃣ بررسی senderId با assigneeId
     if (msg.senderId && conversation.assigneeId) {
       if (msg.senderId === conversation.assigneeId) {
         return true;
       }
     }
 
+    // 4️⃣ بررسی senderId با currentStaffId
     if (msg.senderId && currentStaffId.current) {
       if (msg.senderId === currentStaffId.current) {
         return true;
       }
     }
 
+    // 5️⃣ بررسی senderName با currentUserName
     if (msg.senderName && currentUserName.current) {
       if (msg.senderName === currentUserName.current) {
         return true;
       }
     }
+
+    // 6️⃣ بررسی کلمات کلیدی در senderName
+    if (msg.senderName) {
+      const supportKeywords = [
+        "پشتیبانی",
+        "ادمین",
+        "مدیر",
+        "support",
+        "admin",
+        "agent",
+      ];
+      const lowerName = msg.senderName.toLowerCase();
+      if (supportKeywords.some((keyword) => lowerName.includes(keyword))) {
+        return true;
+      }
+    }
+
     return false;
   };
 
-  // ✅ نمایش فایل در پیام (با پشتیبانی از فرمت‌های مختلف)
+  // ✅ نمایش فایل در پیام
   const renderMessageContent = (text: string) => {
-    // بررسی وجود تصویر با فرمت ![name](url)
     const imageMatch = text.match(/!\[([^\]]*)\]\(([^)]+)\)/);
     if (imageMatch) {
       const [, alt, url] = imageMatch;
@@ -437,7 +474,6 @@ export default function ConversationChat({
       );
     }
 
-    // بررسی وجود فایل با فرمت 📎 **name** (size)\nurl
     const fileMatch = text.match(/📎 \*\*([^*]+)\*\* \(([^)]+)\)\n([^\n]+)/);
     if (fileMatch) {
       const [, fileName, fileSize, fileUrl] = fileMatch;
@@ -460,7 +496,6 @@ export default function ConversationChat({
       );
     }
 
-    // بررسی وجود فایل با فرمت 📎 name\nurl
     const oldFileMatch = text.match(/📎 ([^\n]+)\n([^\n]+)/);
     if (oldFileMatch) {
       const [, fileName, fileUrl] = oldFileMatch;
@@ -484,6 +519,11 @@ export default function ConversationChat({
     }
 
     return <p className="whitespace-pre-wrap">{text}</p>;
+  };
+
+  // ✅ **اصلاح: استفاده از ترکیب id + timestamp برای کلید یکتا**
+  const getUniqueKey = (msg: any) => {
+    return `${msg.id}-${msg.createdAt || msg.time || Date.now()}`;
   };
 
   return (
@@ -566,7 +606,6 @@ export default function ConversationChat({
               </div>
             )}
 
-            {/* ✅ دراپ‌دان تخصیص با لیست فیلتر شده */}
             {(isAdmin || isManager) && filteredEmployees.length > 0 && (
               <div className="relative" ref={dropdownRef}>
                 <button
@@ -580,7 +619,6 @@ export default function ConversationChat({
                     <div className="p-2 border-b border-[rgba(255,255,255,0.1)]">
                       <p className="text-xs text-gray-500">انتخاب مسئول جدید</p>
                     </div>
-                    {/* ✅ استفاده از filteredEmployees به جای assignableEmployees */}
                     {filteredEmployees.map((emp) => (
                       <button
                         key={emp.id}
@@ -642,19 +680,23 @@ export default function ConversationChat({
             </p>
           </div>
         ) : (
-          // ✅ مرتب‌سازی پیام‌ها بر اساس createdAt (قدیمی‌ترین اول)
           [...conversation.messages]
             .sort((a, b) => {
               const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
               const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
               return dateA - dateB;
             })
+            .filter(
+              (msg, index, self) =>
+                index === self.findIndex((m) => m.id === msg.id),
+            )
             .map((msg) => {
               const isFromSupport = isMessageFromSupport(msg);
+              const uniqueKey = getUniqueKey(msg);
 
               return (
                 <div
-                  key={msg.id}
+                  key={uniqueKey}
                   className={`flex gap-3 ${isFromSupport ? "flex-row" : "flex-row-reverse"}`}
                 >
                   <div className="flex flex-col max-w-[85%]">
@@ -687,7 +729,6 @@ export default function ConversationChat({
 
       {/* Input */}
       <div className="border-t border-[rgba(255,255,255,0.1)] bg-[rgba(9,22,18,0.95)] p-4">
-        {/* پیش‌نمایش فایل انتخاب شده */}
         {selectedFile && (
           <div className="flex items-center gap-3 mb-3 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)]">
             {filePreview ? (

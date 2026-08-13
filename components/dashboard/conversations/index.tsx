@@ -1,291 +1,356 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { MessageCircle, Loader2 } from 'lucide-react';
-import { useModal } from '@/components/ui/modal';
-import { Conversation, AssignableEmployee } from './types';
-import ConversationList from './ConversationList';
-import ConversationChat from './ConversationChat';
-import ConversationDetails from './ConversationDetails';
-import { useRoleStore } from '@/stores/useRoleStore';
-import { api } from '@/services/api-client';
-import { authService } from '@/services/auth.service';
-import { fetchStaffList } from '@/services/membersApi';
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { MessageCircle, Loader2 } from "lucide-react";
+import { useModal } from "@/components/ui/modal";
+import { Conversation, AssignableEmployee } from "./types";
+import ConversationList from "./ConversationList";
+import ConversationChat from "./ConversationChat";
+import ConversationDetails from "./ConversationDetails";
+import { useRoleStore } from "@/stores/useRoleStore";
+import { api } from "@/services/api-client";
+import { authService } from "@/services/auth.service";
+import { fetchStaffList } from "@/services/membersApi";
+import { useSocket } from "@/hooks/useSocket";
 
-type ViewMode = 'list' | 'chat' | 'details';
-type LayoutMode = 'desktop' | 'tablet' | 'mobile';
+type ViewMode = "list" | "chat" | "details";
+type LayoutMode = "desktop" | "tablet" | "mobile";
 
 export default function ConversationsContainer() {
   const { role } = useRoleStore();
-  const { showSuccess, showInfo, showWarning, showError, showConfirm } = useModal();
+  const { showSuccess, showInfo, showWarning, showError, showConfirm } =
+    useModal();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [newMessage, setNewMessage] = useState('');
+  const [selectedConversation, setSelectedConversation] =
+    useState<Conversation | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [newMessage, setNewMessage] = useState("");
   const [showDetails, setShowDetails] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('desktop');
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("desktop");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [assignableEmployees, setAssignableEmployees] = useState<AssignableEmployee[]>([]);
+  const [assignableEmployees, setAssignableEmployees] = useState<
+    AssignableEmployee[]
+  >([]);
   const [isAssigning, setIsAssigning] = useState(false);
-  const [userStaffInfo, setUserStaffInfo] = useState<{ id: number; departmentId: number | null; role: string; name: string } | null>(null);
-  
+  const [userStaffInfo, setUserStaffInfo] = useState<{
+    id: number;
+    departmentId: number | null;
+    role: string;
+    name: string;
+  } | null>(null);
+
   const isInitialized = useRef(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
+  
+  // ✅ لیست ID پیام‌های در حال ارسال (برای جلوگیری از تکراری)
+  const pendingMessageIds = useRef<Set<string>>(new Set());
 
-  const isAdmin = role === 'مدیر کل';
-  const isManager = role === 'مدیر';
+  const isAdmin = role === "مدیر کل";
+  const isManager = role === "مدیر";
 
   const currentUser = useMemo(() => {
-    if (typeof window === 'undefined') return null;
+    if (typeof window === "undefined") return null;
     return authService.getStoredUserData();
   }, []);
 
-  // ✅ اصلاح: دریافت دپارتمان از اطلاعات staff
   const userDepartment = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    if (isAdmin) return '';
-    
-    // ✅ اگر اطلاعات staff موجود است و departmentId دارد
+    if (typeof window === "undefined") return "";
+    if (isAdmin) return "";
+
     if (userStaffInfo?.departmentId) {
-      // نام دپارتمان رو از assignableEmployees پیدا کن
-      const foundDept = assignableEmployees.find(emp => emp.departmentId === userStaffInfo.departmentId);
+      const foundDept = assignableEmployees.find(
+        (emp) => emp.departmentId === userStaffInfo.departmentId,
+      );
       if (foundDept?.department) {
-        console.log('📌 دپارتمان کاربر از assignableEmployees:', foundDept.department);
         return foundDept.department;
       }
-      
-      // یا از localStorage
-      const dept = localStorage.getItem('userDepartment') || 
-                   localStorage.getItem('departmentName') || 
-                   '';
-      console.log('📌 userDepartment از localStorage:', dept);
+
+      const dept =
+        localStorage.getItem("userDepartment") ||
+        localStorage.getItem("departmentName") ||
+        "";
       return dept;
     }
-    
-    const dept = localStorage.getItem('userDepartment') || 
-                 localStorage.getItem('departmentName') || 
-                 '';
-    console.log('📌 userDepartment (fallback):', dept);
+
+    const dept =
+      localStorage.getItem("userDepartment") ||
+      localStorage.getItem("departmentName") ||
+      "";
     return dept;
   }, [isAdmin, userStaffInfo, assignableEmployees]);
+
+  // ✅ اصلاح: فقط پیام‌های جدید از Socket را اضافه کن
+  const handleNewMessage = useCallback((message: any) => {
+    console.log("📩 پیام جدید از Socket:", message);
+
+    const msgId = String(message.id);
+    const convId = typeof message.conversationId === "string" 
+      ? parseInt(message.conversationId) 
+      : message.conversationId;
+
+    // ✅ اگر پیام در حال ارسال است (pending)، نادیده بگیر
+    if (pendingMessageIds.current.has(msgId)) {
+      console.log("ℹ️ پیام در حال ارسال، نادیده گرفته شد:", msgId);
+      pendingMessageIds.current.delete(msgId);
+      return;
+    }
+
+    // ✅ اگر پیام قبلاً در UI وجود دارد، نادیده بگیر
+    let exists = false;
+    
+    // بررسی در selectedConversation
+    setSelectedConversation((prev) => {
+      if (!prev) return prev;
+      if (prev.id !== convId) return prev;
+      
+      const found = prev.messages.some((m) => String(m.id) === msgId);
+      if (found) {
+        exists = true;
+        console.log("⚠️ پیام تکراری در selectedConversation، نادیده گرفته شد:", msgId);
+        return prev;
+      }
+
+      const newMsg = {
+        id: msgId,
+        senderName: message.senderName || (message.senderType === "customer" ? "مشتری" : "پشتیبانی"),
+        text: message.text,
+        time: message.timestamp ? new Date(message.timestamp).toLocaleTimeString("fa-IR") : "همین الان",
+        isSupport: message.senderType === "agent" || message.senderType === "support" || message.senderType === "admin",
+        isInternal: message.isInternal || false,
+        senderType: message.senderType || "customer",
+        senderId: message.senderId || null,
+        fileUrl: message.fileUrl || null,
+        fileType: message.fileType || null,
+        createdAt: message.timestamp || new Date().toISOString(),
+      };
+
+      const updatedMessages = [...prev.messages, newMsg].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateA - dateB;
+      });
+
+      return {
+        ...prev,
+        messages: updatedMessages,
+        lastMessage: message.text,
+        time: "همین الان",
+      };
+    });
+
+    // اگر پیام در selectedConversation وجود داشت، ادامه نده
+    if (exists) return;
+
+    // بررسی در conversations
+    setConversations((prev) =>
+      prev.map((conv) => {
+        if (conv.id !== convId) return conv;
+
+        const found = conv.messages.some((m) => String(m.id) === msgId);
+        if (found) {
+          console.log("⚠️ پیام تکراری در conversations، نادیده گرفته شد:", msgId);
+          return conv;
+        }
+
+        const newMsg = {
+          id: msgId,
+          senderName: message.senderName || (message.senderType === "customer" ? "مشتری" : "پشتیبانی"),
+          text: message.text,
+          time: message.timestamp ? new Date(message.timestamp).toLocaleTimeString("fa-IR") : "همین الان",
+          isSupport: message.senderType === "agent" || message.senderType === "support" || message.senderType === "admin",
+          isInternal: message.isInternal || false,
+          senderType: message.senderType || "customer",
+          senderId: message.senderId || null,
+          fileUrl: message.fileUrl || null,
+          fileType: message.fileType || null,
+          createdAt: message.timestamp || new Date().toISOString(),
+        };
+
+        const updatedMessages = [...conv.messages, newMsg].sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateA - dateB;
+        });
+
+        return {
+          ...conv,
+          messages: updatedMessages,
+          lastMessage: message.text,
+          time: "همین الان",
+        };
+      }),
+    );
+  }, []);
+
+  const { isConnected, sendMessage, socketRef } = useSocket({
+    apiBaseUrl: "http://localhost:3000",
+    conversationId: selectedConversation?.id?.toString() || "",
+    token:
+      typeof window !== "undefined"
+        ? localStorage.getItem("accessToken") || ""
+        : "",
+    onMessage: handleNewMessage,
+    onConnect: () => console.log("✅ Socket connected"),
+    onDisconnect: () => console.log("🔌 Socket disconnected"),
+    onError: (error) => console.error("❌ Socket error:", error),
+  });
 
   useEffect(() => {
     const fetchStaffInfo = async () => {
       if (isAdmin) {
-        console.log('👑 مدیر کل: نیازی به staffId نیست');
-        setUserStaffInfo({ id: 0, departmentId: null, role: 'admin', name: 'مدیر کل' });
+        setUserStaffInfo({
+          id: 0,
+          departmentId: null,
+          role: "admin",
+          name: "مدیر کل",
+        });
         return;
       }
 
       try {
         const staffId = authService.getStaffId();
         if (!staffId) {
-          console.warn('⚠️ staffId وجود ندارد');
+          console.warn("⚠️ staffId وجود ندارد");
           return;
         }
-        
-        const response = await api.get<{ id: number; departmentId: number | null; role: string; name: string }>(`/staff/${staffId}`);
-        console.log('📌 اطلاعات staff از API:', response);
+
+        const response = await api.get<{
+          id: number;
+          departmentId: number | null;
+          role: string;
+          name: string;
+        }>(`/staff/${staffId}`);
         setUserStaffInfo(response);
-        
-        // ✅ ذخیره دپارتمان در localStorage برای استفاده بعدی
-        if (response.departmentId) {
-          // برای دریافت نام دپارتمان، باید از لیست کارمندان استفاده کنیم
-          // این کار بعد از بارگذاری assignableEmployees انجام میشه
-        }
       } catch (error) {
-        console.error('❌ خطا در دریافت اطلاعات staff:', error);
+        console.error("❌ خطا در دریافت اطلاعات staff:", error);
       }
     };
-    
+
     fetchStaffInfo();
   }, [isAdmin]);
 
   const loadAssignableEmployees = useCallback(async () => {
-  if (!isAdmin && !isManager) {
-    console.log('ℹ️ کاربر نه مدیر کل است و نه مدیر دپارتمان، بارگذاری کارمندان skipped');
-    return;
-  }
-  
-  if (isLoadingRef.current) {
-    console.log('⏳ در حال بارگذاری قبلی، صرف نظر...');
-    return;
-  }
-  
-  isLoadingRef.current = true;
-  console.log('🔄 شروع بارگذاری کارمندان قابل تخصیص...');
-  
-  try {
-    console.log('📤 ارسال درخواست به /staff...');
-    const staffResponse = await api.get<any[]>('/staff');
-    console.log('📥 پاسخ خام از API (staff):', staffResponse);
-    
-    let staffs = Array.isArray(staffResponse) ? staffResponse : (staffResponse?.data || []);
-    
-    console.log(`📡 ${staffs.length} کارمند از API دریافت شد`);
-    
-    // ✅ دریافت لیست گفتگوها برای محاسبه تعداد تیکت‌های هر کارمند
-    console.log('📤 ارسال درخواست به /conversation برای محاسبه تعداد گفتگوها...');
-    const convResponse = await api.get<{ data: any[] }>('/conversation');
-    const conversations = convResponse.data || [];
-    console.log(`📡 ${conversations.length} گفتگو برای محاسبه دریافت شد`);
-    
-    // ✅ محاسبه تعداد گفتگوهای باز برای هر کارمند
-    const openConversationsCount: Record<number, number> = {};
-    
-    conversations.forEach((conv: any) => {
-      // فقط گفتگوهای باز را در نظر بگیر (open, waiting, answered)
-      if (conv.status !== 'closed' && conv.agentId) {
-        const agentId = conv.agentId;
-        openConversationsCount[agentId] = (openConversationsCount[agentId] || 0) + 1;
-      }
-    });
-    
-    console.log('📊 تعداد گفتگوهای باز هر کارمند:', openConversationsCount);
-    
-    // ✅ نگاشت به فرمت مورد نیاز با تعداد گفتگوها
-    const mapped = staffs
-      .filter((staff: any) => staff.deletedAt === null)
-      .map((staff: any) => ({
-        id: staff.id,
-        name: staff.name,
-        department: staff.department?.name || 'بدون دپارتمان',
-        departmentId: staff.departmentId || null,
-        tickets: openConversationsCount[staff.id] || 0,
-        role: staff.role,
-      }));
-    
-    console.log('✅ لیست کارمندان با تعداد گفتگو:', mapped);
-    setAssignableEmployees(mapped);
-    
-    // ✅ اگر کاربر مدیر دپارتمان است و userStaffInfo دپارتمان دارد، name رو تنظیم کن
-    if (isManager && userStaffInfo?.departmentId) {
-      const userDept = mapped.find(emp => emp.departmentId === userStaffInfo.departmentId);
-      if (userDept?.department) {
-        localStorage.setItem('userDepartment', userDept.department);
-        localStorage.setItem('departmentName', userDept.department);
-        console.log(`✅ دپارتمان کاربر تنظیم شد: ${userDept.department}`);
-      }
+    if (!isAdmin && !isManager) {
+      return;
     }
-    
-  } catch (error) {
-    console.error('❌ خطا در دریافت لیست کارمندان از API:', error);
-    
-    // ✅ اگر خطا خورد، از fetchStaffList استفاده کن
+
+    if (isLoadingRef.current) {
+      return;
+    }
+
+    isLoadingRef.current = true;
+
     try {
-      console.log('🔄 تلاش با fetchStaffList...');
-      const staffList = await fetchStaffList();
-      console.log(`📡 ${staffList.length} کارمند از fetchStaffList دریافت شد`);
-      
-      // ✅ دریافت لیست گفتگوها برای محاسبه تعداد تیکت‌ها
-      const convResponse = await api.get<{ data: any[] }>('/conversation');
+      const staffResponse = await api.get<any[]>("/staff");
+      let staffs = Array.isArray(staffResponse)
+        ? staffResponse
+        : staffResponse?.data || [];
+
+      const convResponse = await api.get<{ data: any[] }>("/conversation");
       const conversations = convResponse.data || [];
-      
+
       const openConversationsCount: Record<number, number> = {};
+
       conversations.forEach((conv: any) => {
-        if (conv.status !== 'closed' && conv.agentId) {
+        if (conv.status !== "closed" && conv.agentId) {
           const agentId = conv.agentId;
-          openConversationsCount[agentId] = (openConversationsCount[agentId] || 0) + 1;
+          openConversationsCount[agentId] =
+            (openConversationsCount[agentId] || 0) + 1;
         }
       });
-      
-      const mapped = staffList
+
+      const mapped = staffs
         .filter((staff: any) => staff.deletedAt === null)
         .map((staff: any) => ({
           id: staff.id,
           name: staff.name,
-          department: staff.department?.name || 'بدون دپارتمان',
+          department: staff.department?.name || "بدون دپارتمان",
           departmentId: staff.departmentId || null,
           tickets: openConversationsCount[staff.id] || 0,
           role: staff.role,
         }));
-      
-      console.log('✅ لیست کارمندان از fetchStaffList با تعداد گفتگو:', mapped);
+
       setAssignableEmployees(mapped);
-      
+
       if (isManager && userStaffInfo?.departmentId) {
-        const userDept = mapped.find(emp => emp.departmentId === userStaffInfo.departmentId);
+        const userDept = mapped.find(
+          (emp) => emp.departmentId === userStaffInfo.departmentId,
+        );
         if (userDept?.department) {
-          localStorage.setItem('userDepartment', userDept.department);
-          localStorage.setItem('departmentName', userDept.department);
+          localStorage.setItem("userDepartment", userDept.department);
+          localStorage.setItem("departmentName", userDept.department);
         }
       }
-    } catch (fallbackError) {
-      console.error('❌ خطا در fetchStaffList:', fallbackError);
+    } catch (error) {
+      console.error("❌ خطا در دریافت لیست کارمندان:", error);
       setAssignableEmployees([]);
+    } finally {
+      isLoadingRef.current = false;
     }
-  } finally {
-    isLoadingRef.current = false;
-  }
-}, [isAdmin, isManager, userStaffInfo]);
+  }, [isAdmin, isManager, userStaffInfo]);
 
   const loadConversations = useCallback(async () => {
     if (isLoadingRef.current) return;
     isLoadingRef.current = true;
-    
+
     try {
       setIsLoading(true);
-      console.log('📡 دریافت لیست گفتگوها از API...');
-      
-      const response = await api.get<{ data: any[] }>('/conversation');
+
+      const response = await api.get<{ data: any[] }>("/conversation");
       let convs = response.data || [];
-      
-      console.log(`✅ ${convs.length} گفتگو از API دریافت شد`);
-      
+
       if (isAdmin) {
-        console.log('👑 مدیر کل: نمایش همه گفتگوها');
+        console.log("👑 مدیر کل: نمایش همه گفتگوها");
       } else {
         const staffId = authService.getStaffId();
         const departmentId = userStaffInfo?.departmentId || null;
-        
-        console.log('📌 staffId کاربر:', staffId);
-        console.log('📌 departmentId کاربر:', departmentId);
-        console.log('📌 نقش کاربر:', role);
-        
-        if (role === 'کارمند') {
+
+        if (role === "کارمند") {
           if (staffId) {
             convs = convs.filter((conv: any) => conv.agentId === staffId);
-            console.log(`👤 کارمند با staffId ${staffId}: ${convs.length} گفتگو`);
           } else {
-            console.warn('⚠️ staffId برای کارمند یافت نشد');
             convs = [];
           }
-        } else if (role === 'مدیر') {
+        } else if (role === "مدیر") {
           if (departmentId) {
             convs = convs.filter((conv: any) => conv.teamId === departmentId);
-            console.log(`👔 مدیر دپارتمان (departmentId: ${departmentId}): ${convs.length} گفتگو`);
           } else {
-            console.warn('⚠️ departmentId برای مدیر یافت نشد');
             convs = [];
           }
         }
       }
-      
+
       const formatted = convs.map((conv: any) => {
-        const customerName = conv.customer?.name || conv.customerName || 'مشتری ناشناس';
-        
+        const customerName =
+          conv.customer?.name || conv.customerName || "مشتری ناشناس";
+
         return {
           id: conv.id,
           customerName: customerName,
           customerId: conv.customer?.id || conv.customerId || null,
           customer: conv.customer || null,
-          customerInitial: customerName.charAt(0) || 'م',
-          customerPhone: conv.customerPhone || 'نامشخص',
-          subject: conv.subject || 'بدون موضوع',
-          lastMessage: conv.messages?.[conv.messages.length - 1]?.content || 'بدون پیام',
-          time: conv.lastActivity ? new Date(conv.lastActivity).toLocaleString('fa-IR') : 'چند لحظه پیش',
-          status: conv.status || 'open',
-          department: conv.team?.name || 'بدون دپارتمان',
+          customerInitial: customerName.charAt(0) || "م",
+          customerPhone: conv.customerPhone || "نامشخص",
+          subject: conv.subject || "بدون موضوع",
+          lastMessage:
+            conv.messages?.[conv.messages.length - 1]?.content || "بدون پیام",
+          time: conv.lastActivity
+            ? new Date(conv.lastActivity).toLocaleString("fa-IR")
+            : "چند لحظه پیش",
+          status: conv.status || "open",
+          department: conv.team?.name || "بدون دپارتمان",
           departmentId: conv.teamId || conv.team?.id || null,
-          assignee: conv.agent?.name || '',
+          assignee: conv.agent?.name || "",
           assigneeId: conv.agentId || conv.agent?.id || null,
-          source: conv.source || 'ویجت سایت',
-          startDate: conv.createdAt ? new Date(conv.createdAt).toLocaleDateString('fa-IR') : '',
-          priority: conv.priority || 'normal',
+          source: conv.source || "ویجت سایت",
+          startDate: conv.createdAt
+            ? new Date(conv.createdAt).toLocaleDateString("fa-IR")
+            : "",
+          priority: conv.priority || "normal",
           unreadCount: conv.unreadCount || 0,
           messages: (conv.messages || [])
             .slice()
@@ -296,12 +361,19 @@ export default function ConversationsContainer() {
             })
             .map((msg: any) => ({
               id: msg.id,
-              senderName: msg.senderName || (msg.senderType === 'customer' ? 'مشتری' : 'پشتیبانی'),
+              senderName:
+                msg.senderName ||
+                (msg.senderType === "customer" ? "مشتری" : "پشتیبانی"),
               text: msg.content,
-              time: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('fa-IR') : '',
-              isSupport: msg.senderType === 'agent' || msg.senderType === 'support' || msg.senderType === 'admin',
+              time: msg.createdAt
+                ? new Date(msg.createdAt).toLocaleTimeString("fa-IR")
+                : "",
+              isSupport:
+                msg.senderType === "agent" ||
+                msg.senderType === "support" ||
+                msg.senderType === "admin",
               isInternal: msg.isInternalNote || false,
-              senderType: msg.senderType || 'customer',
+              senderType: msg.senderType || "customer",
               senderId: msg.senderId ?? null,
               fileUrl: msg.fileUrl || null,
               fileType: msg.fileType || null,
@@ -311,38 +383,31 @@ export default function ConversationsContainer() {
           updatedAt: conv.updatedAt,
         };
       });
-      
-      console.log(`📋 ${formatted.length} گفتگو فرمت شد`);
+
       setConversations(formatted);
-      
+
       if (formatted.length > 0 && !selectedConversation) {
         setSelectedConversation(formatted[0]);
       }
-      
     } catch (error) {
-      console.error('❌ خطا در دریافت گفتگوها:', error);
-      showError('خطا در بارگذاری گفتگوها');
+      console.error("❌ خطا در دریافت گفتگوها:", error);
+      showError("خطا در بارگذاری گفتگوها");
     } finally {
       setIsLoading(false);
       isLoadingRef.current = false;
     }
   }, [selectedConversation, showError, role, userStaffInfo, isAdmin]);
 
-  // ✅ اصلاح useEffect برای اطمینان از بارگذاری
   useEffect(() => {
-    console.log('🔄 useEffect - isAdmin:', isAdmin, 'userStaffInfo:', userStaffInfo, 'isInitialized:', isInitialized.current);
-    
     if (isAdmin) {
       if (!isInitialized.current) {
         isInitialized.current = true;
-        console.log('🚀 بارگذاری اولیه برای مدیر کل...');
         (async () => {
           try {
             await loadConversations();
             await loadAssignableEmployees();
-            console.log('✅ بارگذاری اولیه برای مدیر کل کامل شد');
           } catch (error) {
-            console.error('❌ خطا در بارگذاری اولیه:', error);
+            console.error("❌ خطا در بارگذاری اولیه:", error);
           }
         })();
       }
@@ -351,14 +416,12 @@ export default function ConversationsContainer() {
 
     if (userStaffInfo !== null && !isInitialized.current) {
       isInitialized.current = true;
-      console.log('🚀 بارگذاری اولیه برای کاربر...');
       (async () => {
         try {
           await loadConversations();
           await loadAssignableEmployees();
-          console.log('✅ بارگذاری اولیه برای کاربر کامل شد');
         } catch (error) {
-          console.error('❌ خطا در بارگذاری اولیه:', error);
+          console.error("❌ خطا در بارگذاری اولیه:", error);
         }
       })();
     }
@@ -370,7 +433,7 @@ export default function ConversationsContainer() {
         loadConversations();
       }, 60000);
     }
-    
+
     return () => {
       if (refreshInterval.current) {
         clearInterval(refreshInterval.current);
@@ -381,265 +444,321 @@ export default function ConversationsContainer() {
   const filters = useMemo(() => {
     const counts = {
       all: conversations.length,
-      open: conversations.filter(c => c.status === 'open').length,
-      waiting: conversations.filter(c => c.status === 'waiting').length,
-      answered: conversations.filter(c => c.status === 'answered').length,
-      closed: conversations.filter(c => c.status === 'closed').length,
+      open: conversations.filter((c) => c.status === "open").length,
+      waiting: conversations.filter((c) => c.status === "waiting").length,
+      answered: conversations.filter((c) => c.status === "answered").length,
+      closed: conversations.filter((c) => c.status === "closed").length,
     };
     return [
-      { id: 'all', label: 'همه', count: counts.all },
-      { id: 'open', label: 'باز', count: counts.open },
-      { id: 'waiting', label: 'در انتظار', count: counts.waiting },
-      { id: 'answered', label: 'پاسخ داده شده', count: counts.answered },
-      { id: 'closed', label: 'بسته شده', count: counts.closed },
+      { id: "all", label: "همه", count: counts.all },
+      { id: "open", label: "باز", count: counts.open },
+      { id: "waiting", label: "در انتظار", count: counts.waiting },
+      { id: "answered", label: "پاسخ داده شده", count: counts.answered },
+      { id: "closed", label: "بسته شده", count: counts.closed },
     ];
   }, [conversations]);
 
   const filteredConversations = useMemo(() => {
-    return conversations.filter(conv => {
-      if (activeFilter !== 'all' && conv.status !== activeFilter) return false;
+    return conversations.filter((conv) => {
+      if (activeFilter !== "all" && conv.status !== activeFilter) return false;
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const matchName = conv.customerName?.toLowerCase().includes(query) || false;
-        const matchSubject = conv.subject?.toLowerCase().includes(query) || false;
+        const matchName =
+          conv.customerName?.toLowerCase().includes(query) || false;
+        const matchSubject =
+          conv.subject?.toLowerCase().includes(query) || false;
         const matchPhone = conv.customerPhone?.includes(query) || false;
-        const matchAssignee = conv.assignee?.toLowerCase().includes(query) || false;
-        const matchDepartment = conv.department?.toLowerCase().includes(query) || false;
-        if (!matchName && !matchSubject && !matchPhone && !matchAssignee && !matchDepartment) return false;
+        const matchAssignee =
+          conv.assignee?.toLowerCase().includes(query) || false;
+        const matchDepartment =
+          conv.department?.toLowerCase().includes(query) || false;
+        if (
+          !matchName &&
+          !matchSubject &&
+          !matchPhone &&
+          !matchAssignee &&
+          !matchDepartment
+        )
+          return false;
       }
       return true;
     });
   }, [conversations, activeFilter, searchQuery]);
 
-  const handleSendMessage = useCallback(async (message: string) => {
-    if (!selectedConversation || !message.trim() || isSending) return;
-    
-    setIsSending(true);
-    
-    try {
-      console.log(`📤 ارسال پیام به گفتگو ${selectedConversation.id}:`, message);
-      
-      await api.post(`/conversation/${selectedConversation.id}/message`, {
-        content: message,
-        isInternalNote: false,
-      });
-      
-      const newMsg = {
-        id: Date.now(),
-        senderName: currentUser?.userName || 'شما',
-        text: message,
-        time: new Date().toLocaleTimeString('fa-IR'),
-        isSupport: true,
-        isInternal: false,
-        senderType: 'agent',
-        senderId: currentUser?.staffId || null,
-        createdAt: new Date().toISOString(),
-      };
-      
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === selectedConversation.id) {
-          const updatedMessages = [...conv.messages, newMsg]
-            .sort((a, b) => {
+  // ✅ اصلاح: فقط Socket با pendingMessageIds
+  const handleSendMessage = useCallback(
+    async (message: string) => {
+      if (!selectedConversation || !message.trim() || isSending) return;
+
+      setIsSending(true);
+
+      try {
+        if (isConnected && socketRef.current) {
+          // ✅ تولید ID یکتا برای پیام
+          const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+          pendingMessageIds.current.add(tempId);
+
+          // ✅ ارسال از طریق Socket
+          socketRef.current.emit("send_message", {
+            conversationId: selectedConversation.id.toString(),
+            text: message,
+            isInternal: false,
+            senderName: currentUser?.userName || "پشتیبانی",
+            senderType: "agent",
+          });
+
+          // ✅ پیام را به صورت محلی اضافه کن
+          const newMsg = {
+            id: tempId,
+            senderName: currentUser?.userName || "شما",
+            text: message,
+            time: new Date().toLocaleTimeString("fa-IR"),
+            isSupport: true,
+            isInternal: false,
+            senderType: "agent",
+            senderId: currentUser?.staffId || null,
+            createdAt: new Date().toISOString(),
+          };
+
+          setConversations((prev) =>
+            prev.map((conv) => {
+              if (conv.id === selectedConversation.id) {
+                const updatedMessages = [...conv.messages, newMsg].sort(
+                  (a, b) => {
+                    const dateA = a.createdAt
+                      ? new Date(a.createdAt).getTime()
+                      : 0;
+                    const dateB = b.createdAt
+                      ? new Date(b.createdAt).getTime()
+                      : 0;
+                    return dateA - dateB;
+                  },
+                );
+
+                return {
+                  ...conv,
+                  messages: updatedMessages,
+                  lastMessage: message,
+                  time: "همین الان",
+                };
+              }
+              return conv;
+            }),
+          );
+
+          setSelectedConversation((prev) => {
+            if (!prev) return prev;
+            const updatedMessages = [...prev.messages, newMsg].sort((a, b) => {
               const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
               const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
               return dateA - dateB;
             });
-          
-          return {
-            ...conv,
-            messages: updatedMessages,
-            lastMessage: message,
-            time: 'همین الان',
-          };
-        }
-        return conv;
-      }));
-      
-      setSelectedConversation(prev => {
-        if (!prev) return prev;
-        const updatedMessages = [...prev.messages, newMsg]
-          .sort((a, b) => {
-            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return dateA - dateB;
+
+            return {
+              ...prev,
+              messages: updatedMessages,
+              lastMessage: message,
+              time: "همین الان",
+            };
           });
-        
-        return {
-          ...prev,
-          messages: updatedMessages,
-          lastMessage: message,
-          time: 'همین الان',
-        };
-      });
-      
-      setNewMessage('');
-      showSuccess('پیام با موفقیت ارسال شد');
-      
-    } catch (error) {
-      console.error('❌ خطا در ارسال پیام:', error);
-      showError('خطا در ارسال پیام');
-    } finally {
-      setIsSending(false);
-    }
-  }, [selectedConversation, isSending, showSuccess, showError, currentUser]);
 
-  const handleSelectConversation = useCallback((conversation: Conversation) => {
-    setSelectedConversation(conversation);
-    setShowDetails(false);
-    if (layoutMode === 'mobile' || layoutMode === 'tablet') {
-      setViewMode('chat');
-    }
-  }, [layoutMode]);
-
-  const handleAssignConversation = useCallback(async (staffId: number) => {
-    if (!selectedConversation) return;
-    
-    setIsAssigning(true);
-    
-    try {
-      console.log(`📤 تخصیص گفتگو ${selectedConversation.id} به کارمند ${staffId}`);
-      
-      await api.patch(`/conversation/${selectedConversation.id}`, {
-        agentId: staffId,
-      });
-      
-      const assignedStaff = assignableEmployees.find(emp => emp.id === staffId);
-      
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === selectedConversation.id) {
-          return {
-            ...conv,
-            assignee: assignedStaff?.name || '',
-            assigneeId: staffId,
-          };
+          setNewMessage("");
+          showSuccess("پیام با موفقیت ارسال شد");
+        } else {
+          console.error("❌ Socket متصل نیست، پیام ارسال نشد");
+          showError("اتصال به سرور برقرار نیست. لطفاً دوباره تلاش کنید.");
         }
-        return conv;
-      }));
-      
-      setSelectedConversation(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          assignee: assignedStaff?.name || '',
-          assigneeId: staffId,
-        };
-      });
-      
-      showSuccess(`گفتگو با موفقیت به ${assignedStaff?.name || 'کارمند'} تخصیص داده شد`);
-      
-    } catch (error) {
-      console.error('❌ خطا در تخصیص گفتگو:', error);
-      showError('خطا در تخصیص گفتگو');
-    } finally {
-      setIsAssigning(false);
-    }
-  }, [selectedConversation, assignableEmployees, showSuccess, showError]);
+      } catch (error) {
+        console.error("❌ خطا در ارسال پیام:", error);
+        showError("خطا در ارسال پیام");
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [
+      selectedConversation,
+      isSending,
+      showSuccess,
+      showError,
+      currentUser,
+      isConnected,
+      socketRef,
+    ],
+  );
 
-  const handleChangeStatus = useCallback(async (status: string) => {
-    if (!selectedConversation) return;
-    
-    try {
-      console.log(`📤 تغییر وضعیت گفتگو ${selectedConversation.id} به ${status}`);
-      
-      await api.patch(`/conversation/${selectedConversation.id}`, {
-        status: status,
-      });
-      
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === selectedConversation.id) {
-          return {
-            ...conv,
-            status: status as any,
-          };
-        }
-        return conv;
-      }));
-      
-      setSelectedConversation(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          status: status as any,
-        };
-      });
-      
-      const statusLabels: Record<string, string> = {
-        open: 'باز',
-        waiting: 'در انتظار پاسخ',
-        answered: 'پاسخ داده شده',
-        closed: 'بسته شده',
-      };
-      showSuccess(`وضعیت گفتگو به "${statusLabels[status] || status}" تغییر یافت`);
-      
-    } catch (error) {
-      console.error('❌ خطا در تغییر وضعیت:', error);
-      showError('خطا در تغییر وضعیت گفتگو');
-    }
-  }, [selectedConversation, showSuccess, showError]);
+  const handleSelectConversation = useCallback(
+    (conversation: Conversation) => {
+      setSelectedConversation(conversation);
+      setShowDetails(false);
+      if (layoutMode === "mobile" || layoutMode === "tablet") {
+        setViewMode("chat");
+      }
+    },
+    [layoutMode],
+  );
 
-  const handleCloseConversation = useCallback(async () => {
-    if (!selectedConversation) return;
-    
-    showConfirm(
-      `آیا از بستن گفتگو با "${selectedConversation.customerName}" مطمئن هستید؟`,
-      'تایید بستن گفتگو',
-      async () => {
-        try {
-          await api.patch(`/conversation/${selectedConversation.id}`, {
-            status: 'closed',
-          });
-          
-          setConversations(prev => prev.map(conv => {
+  const handleAssignConversation = useCallback(
+    async (staffId: number) => {
+      if (!selectedConversation) return;
+
+      setIsAssigning(true);
+
+      try {
+        await api.patch(`/conversation/${selectedConversation.id}`, {
+          agentId: staffId,
+        });
+
+        const assignedStaff = assignableEmployees.find(
+          (emp) => emp.id === staffId,
+        );
+
+        setConversations((prev) =>
+          prev.map((conv) => {
             if (conv.id === selectedConversation.id) {
               return {
                 ...conv,
-                status: 'closed',
+                assignee: assignedStaff?.name || "",
+                assigneeId: staffId,
               };
             }
             return conv;
-          }));
-          
-          setSelectedConversation(prev => {
+          }),
+        );
+
+        setSelectedConversation((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            assignee: assignedStaff?.name || "",
+            assigneeId: staffId,
+          };
+        });
+
+        showSuccess(
+          `گفتگو با موفقیت به ${assignedStaff?.name || "کارمند"} تخصیص داده شد`,
+        );
+      } catch (error) {
+        console.error("❌ خطا در تخصیص گفتگو:", error);
+        showError("خطا در تخصیص گفتگو");
+      } finally {
+        setIsAssigning(false);
+      }
+    },
+    [selectedConversation, assignableEmployees, showSuccess, showError],
+  );
+
+  const handleChangeStatus = useCallback(
+    async (status: string) => {
+      if (!selectedConversation) return;
+
+      try {
+        await api.patch(`/conversation/${selectedConversation.id}`, {
+          status: status,
+        });
+
+        setConversations((prev) =>
+          prev.map((conv) => {
+            if (conv.id === selectedConversation.id) {
+              return {
+                ...conv,
+                status: status as any,
+              };
+            }
+            return conv;
+          }),
+        );
+
+        setSelectedConversation((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            status: status as any,
+          };
+        });
+
+        const statusLabels: Record<string, string> = {
+          open: "باز",
+          waiting: "در انتظار پاسخ",
+          answered: "پاسخ داده شده",
+          closed: "بسته شده",
+        };
+        showSuccess(
+          `وضعیت گفتگو به "${statusLabels[status] || status}" تغییر یافت`,
+        );
+      } catch (error) {
+        console.error("❌ خطا در تغییر وضعیت:", error);
+        showError("خطا در تغییر وضعیت گفتگو");
+      }
+    },
+    [selectedConversation, showSuccess, showError],
+  );
+
+  const handleCloseConversation = useCallback(async () => {
+    if (!selectedConversation) return;
+
+    showConfirm(
+      `آیا از بستن گفتگو با "${selectedConversation.customerName}" مطمئن هستید؟`,
+      "تایید بستن گفتگو",
+      async () => {
+        try {
+          await api.patch(`/conversation/${selectedConversation.id}`, {
+            status: "closed",
+          });
+
+          setConversations((prev) =>
+            prev.map((conv) => {
+              if (conv.id === selectedConversation.id) {
+                return {
+                  ...conv,
+                  status: "closed",
+                };
+              }
+              return conv;
+            }),
+          );
+
+          setSelectedConversation((prev) => {
             if (!prev) return prev;
             return {
               ...prev,
-              status: 'closed',
+              status: "closed",
             };
           });
-          
-          showSuccess(`گفتگو با ${selectedConversation.customerName} با موفقیت بسته شد`);
-          
+
+          showSuccess(
+            `گفتگو با ${selectedConversation.customerName} با موفقیت بسته شد`,
+          );
         } catch (error) {
-          console.error('❌ خطا در بستن گفتگو:', error);
-          showError('خطا در بستن گفتگو');
+          console.error("❌ خطا در بستن گفتگو:", error);
+          showError("خطا در بستن گفتگو");
         }
-      }
+      },
     );
   }, [selectedConversation, showConfirm, showSuccess, showError]);
 
   useEffect(() => {
     const checkLayout = () => {
       const width = window.innerWidth;
-      if (width < 768) setLayoutMode('mobile');
-      else if (width < 1024) setLayoutMode('tablet');
-      else setLayoutMode('desktop');
+      if (width < 768) setLayoutMode("mobile");
+      else if (width < 1024) setLayoutMode("tablet");
+      else setLayoutMode("desktop");
     };
     checkLayout();
-    window.addEventListener('resize', checkLayout);
-    return () => window.removeEventListener('resize', checkLayout);
+    window.addEventListener("resize", checkLayout);
+    return () => window.removeEventListener("resize", checkLayout);
   }, []);
 
   const handleBackToList = useCallback(() => {
-    if (layoutMode === 'mobile' || layoutMode === 'tablet') {
-      setViewMode('list');
+    if (layoutMode === "mobile" || layoutMode === "tablet") {
+      setViewMode("list");
       setShowDetails(false);
     }
   }, [layoutMode]);
 
   const handleBackToChat = useCallback(() => {
-    if ((layoutMode === 'mobile' || layoutMode === 'tablet') && showDetails) {
+    if ((layoutMode === "mobile" || layoutMode === "tablet") && showDetails) {
       setShowDetails(false);
-      setViewMode('chat');
+      setViewMode("chat");
     }
   }, [layoutMode, showDetails]);
 
@@ -652,11 +771,12 @@ export default function ConversationsContainer() {
     );
   }
 
-  // ========== حالت دسکتاپ ==========
-  if (layoutMode === 'desktop') {
+  if (layoutMode === "desktop") {
     return (
       <div className="flex h-[calc(100vh-120px)] gap-4 ">
-        <div className={`${showDetails ? 'w-[300px]' : 'w-[360px]'} flex-shrink-0 transition-all duration-300 h-full`}>
+        <div
+          className={`${showDetails ? "w-[300px]" : "w-[360px]"} flex-shrink-0 transition-all duration-300 h-full`}
+        >
           <ConversationList
             conversations={filteredConversations}
             selectedConversation={selectedConversation}
@@ -692,6 +812,8 @@ export default function ConversationsContainer() {
               isAdmin={isAdmin}
               isManager={isManager}
               departmentName={userDepartment}
+              socketRef={socketRef}
+              currentUser={currentUser}
             />
           ) : (
             <div className="h-full flex items-center justify-center rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
@@ -708,7 +830,11 @@ export default function ConversationsContainer() {
             <ConversationDetails
               conversation={selectedConversation}
               onClose={() => setShowDetails(false)}
-              onChangeStatus={() => handleChangeStatus(selectedConversation.status === 'closed' ? 'open' : 'closed')}
+              onChangeStatus={() =>
+                handleChangeStatus(
+                  selectedConversation.status === "closed" ? "open" : "closed",
+                )
+              }
               onAssign={() => {}}
               onCloseConversation={handleCloseConversation}
               onBack={handleBackToChat}
@@ -727,8 +853,7 @@ export default function ConversationsContainer() {
     );
   }
 
-  // ========== حالت تبلت ==========
-  if (layoutMode === 'tablet') {
+  if (layoutMode === "tablet") {
     return (
       <div className="flex h-[calc(100vh-120px)] gap-4">
         <div className="w-[320px] flex-shrink-0 h-full">
@@ -750,7 +875,7 @@ export default function ConversationsContainer() {
         </div>
 
         <div className="flex-1 h-full">
-          {viewMode === 'chat' && selectedConversation && (
+          {viewMode === "chat" && selectedConversation && (
             <ConversationChat
               conversation={selectedConversation}
               newMessage={newMessage}
@@ -769,14 +894,20 @@ export default function ConversationsContainer() {
               isAdmin={isAdmin}
               isManager={isManager}
               departmentName={userDepartment}
+              socketRef={socketRef}
+              currentUser={currentUser}
             />
           )}
 
-          {viewMode === 'details' && selectedConversation && (
+          {viewMode === "details" && selectedConversation && (
             <ConversationDetails
               conversation={selectedConversation}
               onClose={() => setShowDetails(false)}
-              onChangeStatus={() => handleChangeStatus(selectedConversation.status === 'closed' ? 'open' : 'closed')}
+              onChangeStatus={() =>
+                handleChangeStatus(
+                  selectedConversation.status === "closed" ? "open" : "closed",
+                )
+              }
               onAssign={() => {}}
               onCloseConversation={handleCloseConversation}
               onBack={handleBackToChat}
@@ -804,10 +935,9 @@ export default function ConversationsContainer() {
     );
   }
 
-  // ========== حالت موبایل ==========
   return (
     <div className="h-[calc(100vh-120px)]">
-      {viewMode === 'list' && (
+      {viewMode === "list" && (
         <ConversationList
           conversations={filteredConversations}
           selectedConversation={selectedConversation}
@@ -825,7 +955,7 @@ export default function ConversationsContainer() {
         />
       )}
 
-      {viewMode === 'chat' && selectedConversation && (
+      {viewMode === "chat" && selectedConversation && (
         <ConversationChat
           conversation={selectedConversation}
           newMessage={newMessage}
@@ -843,14 +973,20 @@ export default function ConversationsContainer() {
           isAdmin={isAdmin}
           isManager={isManager}
           departmentName={userDepartment}
+          socketRef={socketRef}
+          currentUser={currentUser}
         />
       )}
 
-      {viewMode === 'details' && selectedConversation && (
+      {viewMode === "details" && selectedConversation && (
         <ConversationDetails
           conversation={selectedConversation}
           onClose={() => setShowDetails(false)}
-          onChangeStatus={() => handleChangeStatus(selectedConversation.status === 'closed' ? 'open' : 'closed')}
+          onChangeStatus={() =>
+            handleChangeStatus(
+              selectedConversation.status === "closed" ? "open" : "closed",
+            )
+          }
           onAssign={() => {}}
           onCloseConversation={handleCloseConversation}
           onBack={handleBackToChat}

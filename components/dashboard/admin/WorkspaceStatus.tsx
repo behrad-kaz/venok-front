@@ -4,6 +4,7 @@
 import { motion } from "framer-motion";
 import { CheckCircle, Circle, Code } from "lucide-react";
 import Link from "next/link";
+import { memo } from "react";
 
 interface SetupItem {
   id: number;
@@ -23,12 +24,11 @@ const completedCount = setupItems.filter((item) => item.completed).length;
 const totalCount = setupItems.length;
 const progress = (completedCount / totalCount) * 100;
 
-export default function WorkspaceStatus() {
+function WorkspaceStatusComponent() {
   return (
     <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
       <h3 className="text-sm font-bold text-white mb-4">وضعیت راه‌اندازی Workspace</h3>
 
-      {/* نوار پیشرفت */}
       <div className="mb-4">
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-gray-500">پیشرفت کلی</span>
@@ -46,7 +46,6 @@ export default function WorkspaceStatus() {
         </div>
       </div>
 
-      {/* لیست موارد */}
       <div className="space-y-2.5 mb-4">
         {setupItems.map((item, index) => (
           <motion.div
@@ -74,7 +73,6 @@ export default function WorkspaceStatus() {
         ))}
       </div>
 
-      {/* دکمه اقدام */}
       <div className="pt-3 border-t border-[rgba(255,255,255,0.1)]">
         <p className="text-xs text-gray-500 mb-3">
           برای نمایش دکمه چت روی سایت، ویجت را نصب و پیکربندی کنید.
@@ -90,3 +88,6 @@ export default function WorkspaceStatus() {
     </div>
   );
 }
+
+// ✅ استفاده از memo برای جلوگیری از رندر مجدد
+export default memo(WorkspaceStatusComponent);

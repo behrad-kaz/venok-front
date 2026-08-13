@@ -3,6 +3,7 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { memo } from "react";
 
 interface TrendData {
   day: string;
@@ -22,7 +23,7 @@ const trendData: TrendData[] = [
 
 const maxValue = 20;
 
-export default function ConversationTrend() {
+function ConversationTrendComponent() {
   const [hoveredBar, setHoveredBar] = useState<{ day: string; type: string; value: number } | null>(null);
 
   const getBarHeight = (value: number) => (value / maxValue) * 100;
@@ -36,7 +37,6 @@ export default function ConversationTrend() {
           {trendData.map((data, idx) => (
             <div key={data.day} className="flex-1 flex flex-col items-center gap-2">
               <div className="w-full flex items-end justify-center gap-1 h-32">
-                {/* نوار گفتگوهای جدید */}
                 <motion.div
                   initial={{ height: 0 }}
                   animate={{ height: `${getBarHeight(data.new)}%` }}
@@ -46,7 +46,6 @@ export default function ConversationTrend() {
                   className="w-full rounded-t-lg bg-[rgba(89,216,195,0.3)] border-t-2 border-[#59D8C3] transition-all hover:bg-[rgba(89,216,195,0.4)] cursor-pointer"
                   style={{ height: `${getBarHeight(data.new)}%` }}
                 />
-                {/* نوار گفتگوهای حل‌شده */}
                 <motion.div
                   initial={{ height: 0 }}
                   animate={{ height: `${getBarHeight(data.solved)}%` }}
@@ -62,7 +61,6 @@ export default function ConversationTrend() {
           ))}
         </div>
 
-        {/* Tooltip */}
         {hoveredBar && (
           <div
             className="absolute bg-[#0D1B17] border border-[#59D8C3]/30 rounded-lg px-3 py-1.5 shadow-lg z-50 text-center"
@@ -80,7 +78,6 @@ export default function ConversationTrend() {
         )}
       </div>
 
-      {/* راهنما */}
       <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-[rgba(255,255,255,0.1)]">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded bg-[#59D8C3]" />
@@ -94,3 +91,6 @@ export default function ConversationTrend() {
     </div>
   );
 }
+
+// ✅ استفاده از memo برای جلوگیری از رندر مجدد
+export default memo(ConversationTrendComponent);

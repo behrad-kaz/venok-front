@@ -3,6 +3,7 @@
 
 import { motion } from "framer-motion";
 import { MessageCircle, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { memo } from "react";
 
 interface StatsCardsProps {
   data: {
@@ -19,7 +20,7 @@ interface StatsCardsProps {
   isLoading?: boolean;
 }
 
-export default function StatsCards({ data, changes, isLoading = false }: StatsCardsProps) {
+function StatsCardsComponent({ data, changes, isLoading = false }: StatsCardsProps) {
   const getChangeText = (value: number) => {
     if (value === 0) return 'بدون تغییر';
     const prefix = value > 0 ? '+' : '';
@@ -117,3 +118,6 @@ export default function StatsCards({ data, changes, isLoading = false }: StatsCa
     </div>
   );
 }
+
+// ✅ استفاده از memo برای جلوگیری از رندر مجدد
+export default memo(StatsCardsComponent);

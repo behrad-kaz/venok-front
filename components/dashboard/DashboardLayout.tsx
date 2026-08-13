@@ -22,6 +22,7 @@ import {
 import Header from "../layout/Header";
 import { useRoleStore, UserRole } from "@/stores/useRoleStore";
 import { api } from "@/services/api-client";
+import { useNotifications } from "@/hooks/useNotifications";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -35,10 +36,10 @@ interface MenuItem {
   badge?: number;
 }
 
-// منوی مدیر کل
-const adminMenuItems: MenuItem[] = [
-  { id: "dashboard", title: "داشبورد", icon: LayoutDashboard, href: "/dashboard", badge: 5 },
-  { id: "conversations", title: "گفتگوها", icon: MessageCircle, href: "/dashboard/conversations", badge: 5 },
+// ✅ تعریف آیتم‌های منو با idهای ثابت
+const ADMIN_MENU_ITEMS = [
+  { id: "dashboard", title: "داشبورد", icon: LayoutDashboard, href: "/dashboard" },
+  { id: "conversations", title: "گفتگوها", icon: MessageCircle, href: "/dashboard/conversations" },
   { id: "departments", title: "دپارتمان‌ها", icon: Building2, href: "/dashboard/departments" },
   { id: "members", title: "اعضا", icon: Users, href: "/dashboard/members" },
   { id: "reports", title: "گزارشات", icon: FileText, href: "/dashboard/reports" },
@@ -46,19 +47,41 @@ const adminMenuItems: MenuItem[] = [
   { id: "workspace", title: "تنظیمات Workspace", icon: Settings, href: "/dashboard/workspace-settings" },
 ];
 
-// منوی مدیر دپارتمان
-const managerMenuItems: MenuItem[] = [
+const MANAGER_MENU_ITEMS = [
   { id: "dashboard", title: "داشبورد", icon: LayoutDashboard, href: "/dashboard" },
-  { id: "conversations", title: "گفتگوها", icon: MessageCircle, href: "/dashboard/conversations", badge: 3 },
+  { id: "conversations", title: "گفتگوها", icon: MessageCircle, href: "/dashboard/conversations" },
   { id: "members", title: "اعضای دپارتمان", icon: Users, href: "/dashboard/members" },
   { id: "reports", title: "گزارشات دپارتمان", icon: FileText, href: "/dashboard/reports" },
   { id: "settings", title: "تنظیمات دپارتمان", icon: Settings, href: "/dashboard/settings" },
 ];
 
-// منوی کارمند - فقط داشبورد (صفحه my-conversations حذف شد)
-const staffMenuItems: MenuItem[] = [
+const STAFF_MENU_ITEMS = [
   { id: "dashboard", title: "داشبورد", icon: LayoutDashboard, href: "/dashboard" },
 ];
+
+// ✅ نگاشت نوع نوتیفیکیشن به آیتم منو
+const NOTIFICATION_TO_MENU: Record<string, string> = {
+  'waiting': 'conversations',        // گفتگوهای بدون پاسخ → گفتگوها
+  'unassigned': 'conversations',     // گفتگوهای بدون مسئول → گفتگوها
+  'urgent': 'conversations',         // گفتگوهای فوری → گفتگوها
+  'busy': 'departments',             // دپارتمان‌های شلوغ → دپارتمان‌ها
+  'widget': 'widget',                // مشکل ویجت → ویجت سایت
+  'member_added': 'members',         // عضو جدید → اعضا
+  'member_removed': 'members',       // حذف عضو → اعضا
+  'department_changed': 'departments', // تغییر دپارتمان → دپارتمان‌ها
+};
+
+// ✅ تابع محاسبه badge برای هر آیتم منو
+const calculateMenuBadges = (notifications: any[]) => {
+  const badges: Record<string, number> = {};
+  
+  notifications.forEach((notification) => {
+    const menuId = NOTIFICATION_TO_MENU[notification.type] || 'dashboard';
+    badges[menuId] = (badges[menuId] || 0) + 1;
+  });
+  
+  return badges;
+};
 
 interface SidebarContentProps {
   isSidebarCollapsed: boolean;
@@ -121,7 +144,7 @@ function SidebarContent({
                 {!isSidebarCollapsed && (
                   <>
                     <span className="flex-1 text-right truncate">{item.title}</span>
-                    {item.badge && (
+                    {item.badge !== undefined && item.badge > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F2B84B] text-[#1c1302]">
                         {item.badge}
                       </span>
@@ -186,6 +209,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [companyDescription, setCompanyDescription] = useState("پنل پشتیبانی مشتریان");
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  // ✅ دریافت نوتیفیکیشن‌ها
+  const { notifications, unreadCount } = useNotifications();
+
+  // ✅ محاسبه badge برای هر آیتم منو بر اساس نوتیفیکیشن‌ها
+  const menuBadges = useMemo(() => {
+    return calculateMenuBadges(notifications);
+  }, [notifications]);
 
   useEffect(() => {
     setIsClient(true);
@@ -281,12 +312,29 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => clearTimeout(timer);
   }, [pathname]);
 
+  // ✅ ساخت منو با badge داینامیک بر اساس نوع نوتیفیکیشن
   const getMenuItems = useCallback((): MenuItem[] => {
     if (!currentRole) return [];
-    if (currentRole === "مدیر کل") return adminMenuItems;
-    if (currentRole === "مدیر") return managerMenuItems;
-    return staffMenuItems;
-  }, [currentRole]);
+    
+    let baseItems: typeof ADMIN_MENU_ITEMS = [];
+    
+    if (currentRole === "مدیر کل") {
+      baseItems = ADMIN_MENU_ITEMS;
+    } else if (currentRole === "مدیر") {
+      baseItems = MANAGER_MENU_ITEMS;
+    } else {
+      baseItems = STAFF_MENU_ITEMS;
+    }
+    
+    // ✅ اضافه کردن badge به آیتم‌ها بر اساس نوع نوتیفیکیشن
+    return baseItems.map((item) => {
+      const badgeCount = menuBadges[item.id] || 0;
+      if (badgeCount > 0) {
+        return { ...item, badge: badgeCount };
+      }
+      return { ...item };
+    });
+  }, [currentRole, menuBadges]);
 
   const menuItems = useMemo(() => getMenuItems(), [getMenuItems]);
 
@@ -387,7 +435,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     >
                       <Icon className="w-4 h-4 flex-shrink-0" />
                       <span className="flex-1 text-right truncate">{item.title}</span>
-                      {item.badge && (
+                      {item.badge !== undefined && item.badge > 0 && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F2B84B] text-[#1c1302]">
                           {item.badge}
                         </span>
