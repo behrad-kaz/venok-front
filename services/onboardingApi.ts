@@ -1,8 +1,9 @@
 // services/onboardingApi.ts
 import { WorkspaceData } from "@/stores/useOnboardingStore";
 import { api } from "./api-client";
+import { config } from "@/lib/config";
 
-const API_URL = "http://localhost:3000";
+const API_URL = config.apiBaseUrl;
 
 // ✅ تعریف تایپ برای پاسخ organization
 interface OrganizationResponse {

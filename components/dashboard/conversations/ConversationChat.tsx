@@ -402,6 +402,40 @@ export default function ConversationChat({
     return false;
   };
 
+  const getSenderDisplayName = (msg: any, isFromSupport: boolean) => {
+    const raw = (msg.senderName || "").trim();
+    const genericSupport = ["پشتیبانی", "support", "admin", "agent"].some((g) =>
+      raw.toLowerCase().includes(g.toLowerCase()),
+    );
+    const genericCustomer = ["مشتری", "customer"].some((g) =>
+      raw.toLowerCase().includes(g.toLowerCase()),
+    );
+
+    const isCurrentUserMessage = currentUser && (
+      (currentUser.staffId && msg.senderId === currentUser.staffId) ||
+      (currentUser.userId && msg.senderId === currentUser.userId)
+    );
+
+    if (isFromSupport) {
+      if (isCurrentUserMessage) {
+        return (
+          currentUser?.staffName ||
+          (currentUser?.firstName && currentUser?.lastName
+            ? `${currentUser.firstName} ${currentUser.lastName}`
+            : undefined) ||
+          currentUser?.userName ||
+          conversation.assignee ||
+          "پشتیبانی"
+        );
+      }
+      if (raw && !genericSupport) return raw;
+      return "پشتیبانی";
+    }
+
+    if (raw && !genericCustomer) return raw;
+    return conversation.customerName || "مشتری";
+  };
+
   // ✅ نمایش فایل در پیام
   const renderMessageContent = (text: string) => {
     const imageMatch = text.match(/!\[([^\]]*)\]\(([^)]+)\)/);
@@ -655,7 +689,7 @@ export default function ConversationChat({
                     <span
                       className={`text-xs text-gray-500 mb-1 ${isFromSupport ? "text-right" : "text-left"}`}
                     >
-                      {msg.senderName || (isFromSupport ? "پشتیبانی" : "مشتری")}
+                      {getSenderDisplayName(msg, isFromSupport)}
                     </span>
                     <div
                       className={`px-4 py-3 rounded-2xl ${

@@ -10,16 +10,15 @@ import ConversationDetails from "./ConversationDetails";
 import { useRoleStore } from "@/stores/useRoleStore";
 import { api } from "@/services/api-client";
 import { authService } from "@/services/auth.service";
-import { fetchStaffList } from "@/services/membersApi";
 import { useSocket } from "@/hooks/useSocket";
+import { config } from "@/lib/config";
 
 type ViewMode = "list" | "chat" | "details";
 type LayoutMode = "desktop" | "tablet" | "mobile";
 
 export default function ConversationsContainer() {
   const { role } = useRoleStore();
-  const { showSuccess, showInfo, showWarning, showError, showConfirm } =
-    useModal();
+  const { showSuccess, showError, showConfirm } = useModal();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
@@ -49,10 +48,10 @@ export default function ConversationsContainer() {
   const isAdmin = role === "مدیر کل";
   const isManager = role === "مدیر";
 
-  const currentUser = useMemo(() => {
+  const [currentUser] = useState(() => {
     if (typeof window === "undefined") return null;
     return authService.getStoredUserData();
-  }, []);
+  });
 
   const userDepartment = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -89,6 +88,17 @@ export default function ConversationsContainer() {
       ? parseInt(message.conversationId) 
       : message.conversationId;
 
+    const supportName =
+      currentUser?.staffName ||
+      (currentUser?.firstName && currentUser?.lastName
+        ? `${currentUser.firstName} ${currentUser.lastName}`
+        : undefined) ||
+      currentUser?.userName ||
+      "پشتیبانی";
+    const customerName = selectedConversation?.id === convId
+      ? selectedConversation.customerName
+      : "مشتری";
+
     // ✅ اگر پیام قبلاً در UI وجود دارد، نادیده بگیر
     let exists = false;
     
@@ -104,9 +114,19 @@ export default function ConversationsContainer() {
         return prev;
       }
 
+      const isCurrentUserMessage = currentUser && (
+        (currentUser.staffId && message.senderId === currentUser.staffId) ||
+        (currentUser.userId && message.senderId === currentUser.userId)
+      );
+
+      let senderDisplayName = message.senderName;
+      if (isCurrentUserMessage && (message.senderType === "agent" || message.senderType === "admin" || message.senderType === "support")) {
+        senderDisplayName = supportName;
+      }
+
       const newMsg = {
         id: msgId,
-        senderName: message.senderName || (message.senderType === "customer" ? "مشتری" : "پشتیبانی"),
+        senderName: senderDisplayName || (message.senderType === "customer" ? customerName : supportName),
         text: message.text,
         time: message.timestamp ? new Date(message.timestamp).toLocaleTimeString("fa-IR") : "همین الان",
         isSupport: message.senderType === "agent" || message.senderType === "support" || message.senderType === "admin",
@@ -146,9 +166,19 @@ export default function ConversationsContainer() {
           return conv;
         }
 
+        const isCurrentUserMessage = currentUser && (
+          (currentUser.staffId && message.senderId === currentUser.staffId) ||
+          (currentUser.userId && message.senderId === currentUser.userId)
+        );
+
+        let senderDisplayName = message.senderName;
+        if (isCurrentUserMessage && (message.senderType === "agent" || message.senderType === "admin" || message.senderType === "support")) {
+          senderDisplayName = supportName;
+        }
+
         const newMsg = {
           id: msgId,
-          senderName: message.senderName || (message.senderType === "customer" ? "مشتری" : "پشتیبانی"),
+          senderName: senderDisplayName || (message.senderType === "customer" ? customerName : supportName),
           text: message.text,
           time: message.timestamp ? new Date(message.timestamp).toLocaleTimeString("fa-IR") : "همین الان",
           isSupport: message.senderType === "agent" || message.senderType === "support" || message.senderType === "admin",
@@ -174,10 +204,10 @@ export default function ConversationsContainer() {
         };
       }),
     );
-  }, []);
+  }, [currentUser, selectedConversation]);
 
-  const { isConnected, sendMessage, socketRef } = useSocket({
-    apiBaseUrl: "http://localhost:3000",
+  const { isConnected, socketRef } = useSocket({
+    apiBaseUrl: config.apiBaseUrl,
     conversationId: selectedConversation?.id?.toString() || "",
     token:
       typeof window !== "undefined"
@@ -192,11 +222,18 @@ export default function ConversationsContainer() {
   useEffect(() => {
     const fetchStaffInfo = async () => {
       if (isAdmin) {
+        const adminName =
+          (currentUser?.firstName && currentUser?.lastName
+            ? `${currentUser.firstName} ${currentUser.lastName}`
+            : undefined) ||
+          currentUser?.staffName ||
+          "مدیر کل";
+
         setUserStaffInfo({
           id: 0,
           departmentId: null,
           role: "admin",
-          name: "مدیر کل",
+          name: adminName,
         });
         return;
       }
@@ -221,7 +258,7 @@ export default function ConversationsContainer() {
     };
 
     fetchStaffInfo();
-  }, [isAdmin]);
+  }, [isAdmin, currentUser]);
 
   const loadAssignableEmployees = useCallback(async () => {
     if (!isAdmin && !isManager) {
@@ -488,7 +525,13 @@ export default function ConversationsContainer() {
             conversationId: selectedConversation.id.toString(),
             text: message,
             isInternal: false,
-            senderName: currentUser?.userName || "پشتیبانی",
+            senderName:
+              currentUser?.staffName ||
+              (currentUser?.firstName && currentUser?.lastName
+                ? `${currentUser.firstName} ${currentUser.lastName}`
+                : undefined) ||
+              currentUser?.userName ||
+              "پشتیبانی",
             senderType: "agent",
           });
 

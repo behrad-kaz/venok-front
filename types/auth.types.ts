@@ -92,6 +92,8 @@ export interface StoredUserData {
   refreshToken: string;
   userId: number;
   userPhone: string;
+  firstName?: string;
+  lastName?: string;
   currentOrganizationId?: number;
   currentWorkspaceId?: number;
   staffId?: number;

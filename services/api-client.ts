@@ -1,6 +1,5 @@
 // services/api-client.ts
-
-const API_URL = 'http://localhost:3000';
+import { config } from '@/lib/config';
 
 interface RefreshTokenResponse {
   access_token: string;
@@ -72,7 +71,7 @@ const refreshAccessToken = async (): Promise<string> => {
     clearSessionAndRedirectToLogin();
     throw new Error('SESSION_EXPIRED');
   }
-  const response = await fetch(`${API_URL}/auth/refresh`, {
+  const response = await fetch(`${config.apiBaseUrl}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: tokens.refreshToken }),
@@ -118,7 +117,7 @@ export async function apiClient<T>(
   }
   
   const makeRequest = async (): Promise<Response> => {
-    return fetch(`${API_URL}${endpoint}`, {
+    return fetch(`${config.apiBaseUrl}${endpoint}`, {
       ...options,
       headers,
     });
@@ -135,7 +134,7 @@ export async function apiClient<T>(
             addRefreshSubscriber((newToken: string) => {
               const newHeaders = { ...headers };
               newHeaders['Authorization'] = `Bearer ${newToken}`;
-              fetch(`${API_URL}${endpoint}`, {
+              fetch(`${config.apiBaseUrl}${endpoint}`, {
                 ...options,
                 headers: newHeaders,
               })
@@ -152,7 +151,7 @@ export async function apiClient<T>(
           onRefreshed(newToken);
           const newHeaders = { ...headers };
           newHeaders['Authorization'] = `Bearer ${newToken}`;
-          response = await fetch(`${API_URL}${endpoint}`, {
+          response = await fetch(`${config.apiBaseUrl}${endpoint}`, {
             ...options,
             headers: newHeaders,
           });

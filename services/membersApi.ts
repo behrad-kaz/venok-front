@@ -109,8 +109,6 @@ export interface TeamResponse {
 // توابع API
 // ============================================================
 
-const API_URL = 'http://localhost:3000';
-
 // -------- تیم‌ها (دپارتمان‌ها) --------
 
 /**
@@ -293,7 +291,7 @@ export const updateStaff = async (staffId: number, data: UpdateStaffDto): Promis
   
   // حذف فیلدهای undefined
   const cleanData = Object.fromEntries(
-    Object.entries(data).filter(([_, value]) => value !== undefined)
+    Object.entries(data).filter(([, value]) => value !== undefined)
   );
   
   if (Object.keys(cleanData).length === 0) {

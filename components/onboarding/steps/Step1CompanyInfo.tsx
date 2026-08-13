@@ -5,6 +5,7 @@ import { useRef, forwardRef, useImperativeHandle, useState, useEffect } from 're
 import { MessageCircle, Image as ImageIcon, Phone, Mail, Loader2, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { api } from '@/services/api-client';
+import { config } from '@/lib/config';
 import { useModal } from '@/components/ui/modal';
 
 export interface Step1CompanyInfoRef {
@@ -62,7 +63,7 @@ const Step1CompanyInfo = forwardRef<Step1CompanyInfoRef, Step1CompanyInfoProps>(
           let logoUrl = data.logo || null;
           
           if (logoUrl && logoUrl.startsWith('/files/')) {
-            logoUrl = `http://localhost:3000${logoUrl}`;
+            logoUrl = `${config.apiBaseUrl}${logoUrl}`;
           }
           
           console.log('🖼️ آدرس لوگو نهایی:', logoUrl);

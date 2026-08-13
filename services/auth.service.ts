@@ -2,17 +2,6 @@
 import { LoginResponseModel, StoredUserData, UserRolePersianType, UserRoleType, OrganizationModel, WorkspaceModel, LoginApiResponse } from '@/types/auth.types';
 import { api } from './api-client';
 
-// تعریف تایپ برای خطا
-interface ApiError {
-  message?: string;
-  status?: number;
-  response?: {
-    data?: {
-      message?: string;
-    };
-  };
-}
-
 // تعریف تایپ برای Context
 interface DefaultContext {
   organizationId: number;
@@ -30,7 +19,6 @@ interface SwitchContextResponse {
 
 class AuthService {
   private static instance: AuthService;
-  private readonly API_URL = 'http://localhost:3000';
 
   private constructor() {}
 
@@ -199,6 +187,8 @@ class AuthService {
     (loginResponse as any).staffRole = response.user.staffRole;
     (loginResponse as any).staffName = response.user.staffName;
     (loginResponse as any).rawRole = response.user.role;
+    (loginResponse as any).firstName = response.user.firstName;
+    (loginResponse as any).lastName = response.user.lastName;
 
     return loginResponse;
   }
@@ -252,6 +242,8 @@ class AuthService {
     const staffRole = (loginResponse as any).staffRole || null;
     const staffName = (loginResponse as any).staffName || null;
     const rawRole = (loginResponse as any).rawRole || 'user';
+    const firstName = (loginResponse as any).firstName || null;
+    const lastName = (loginResponse as any).lastName || null;
 
     console.log('📦 storeUserData - staffId:', staffId, 'staffRole:', staffRole, 'rawRole:', rawRole);
 
@@ -276,6 +268,8 @@ class AuthService {
       refreshToken: token.refreshToken,
       userId: user.id,
       userPhone: user.phone,
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
       currentOrganizationId: defaultOrganization?.id,
       currentWorkspaceId: defaultWorkspace?.id,
       staffId: staffId || undefined,
@@ -426,6 +420,8 @@ class AuthService {
       refreshToken: localStorage.getItem('refreshToken') || '',
       userId: Number(localStorage.getItem('userId')) || 0,
       userPhone: localStorage.getItem('userPhone') || '',
+      firstName: localStorage.getItem('firstName') || undefined,
+      lastName: localStorage.getItem('lastName') || undefined,
       currentOrganizationId: Number(localStorage.getItem('currentOrganizationId')) || undefined,
       currentWorkspaceId: Number(localStorage.getItem('currentWorkspaceId')) || undefined,
       staffId: Number(localStorage.getItem('staffId')) || undefined,
@@ -439,6 +435,7 @@ class AuthService {
     const keysToRemove = [
       'isLoggedIn', 'hasSeenOnboarding', 'userRole', 'userRoleEnglish',
       'userName', 'userToken', 'refreshToken', 'userId', 'userPhone',
+      'firstName', 'lastName',
       'currentOrganizationId', 'currentWorkspaceId', 'accessToken',
       'organizations', 'currentOrganization', 'currentWorkspace',
       'staffId', 'staffRole', 'staffName'

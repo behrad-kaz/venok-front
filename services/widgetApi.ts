@@ -3,8 +3,6 @@
 // ============================================================
 import { api } from './api-client';
 
-const API_URL = 'http://localhost:3000';
-
 interface WidgetConfigResponse {
   id: number;
   workspaceId: number;

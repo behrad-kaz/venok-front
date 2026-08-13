@@ -3,20 +3,6 @@ import { persist } from "zustand/middleware";
 
 export type UserRole = "مدیر کل" | "مدیر" | "کارمند";
 
-// تبدیل نقش انگلیسی به فارسی
-const englishToPersianRole = (englishRole: string): UserRole => {
-  switch (englishRole) {
-    case "super_admin":
-      return "مدیر کل";
-    case "manager":
-      return "مدیر";
-    case "staff":
-      return "کارمند";
-    default:
-      return "کارمند";
-  }
-};
-
 // تبدیل نقش فارسی به انگلیسی
 const persianToEnglishRole = (persianRole: UserRole): string => {
   switch (persianRole) {
