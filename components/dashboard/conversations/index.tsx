@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { useModal } from "@/components/ui/modal";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Conversation, AssignableEmployee } from "./types";
 import ConversationList from "./ConversationList";
 import ConversationChat from "./ConversationChat";
@@ -40,6 +41,11 @@ export default function ConversationsContainer() {
     role: string;
     name: string;
   } | null>(null);
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+  const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const isInitialized = useRef(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
@@ -108,7 +114,6 @@ export default function ConversationsContainer() {
     return dept;
   }, [isAdmin, userStaffInfo, assignableEmployees]);
 
-  // ✅ اصلاح: فقط پیام‌های جدید از Socket را اضافه کن
   const calculateUnreadCount = useCallback((messages: any[], conversationId: number) => {
     const lastReadAt = lastReadTimestamps.current.get(conversationId) || 0;
     return messages.filter(
@@ -135,10 +140,8 @@ export default function ConversationsContainer() {
       ? selectedConversation.customerName
       : "مشتری";
 
-    // ✅ اگر پیام قبلاً در UI وجود دارد، نادیده بگیر
     let exists = false;
     
-    // بررسی در selectedConversation
     setSelectedConversation((prev) => {
       if (!prev) return prev;
       if (prev.id !== convId) return prev;
@@ -194,10 +197,8 @@ export default function ConversationsContainer() {
       };
     });
 
-    // اگر پیام در selectedConversation وجود داشت، ادامه نده
     if (exists) return;
 
-    // بررسی در conversations
     setConversations((prev) =>
       prev.map((conv) => {
         if (conv.id !== convId) return conv;
@@ -515,12 +516,16 @@ export default function ConversationsContainer() {
   }, [userStaffInfo, isAdmin, loadConversations]);
 
   const filters = useMemo(() => {
+    const baseConversations = departmentFilter
+      ? conversations.filter((c) => c.departmentId === departmentFilter)
+      : conversations;
+    
     const counts = {
-      all: conversations.length,
-      open: conversations.filter((c) => c.status === "open").length,
-      waiting: conversations.filter((c) => c.status === "waiting").length,
-      answered: conversations.filter((c) => c.status === "answered").length,
-      closed: conversations.filter((c) => c.status === "closed").length,
+      all: baseConversations.length,
+      open: baseConversations.filter((c) => c.status === "open").length,
+      waiting: baseConversations.filter((c) => c.status === "waiting").length,
+      answered: baseConversations.filter((c) => c.status === "answered").length,
+      closed: baseConversations.filter((c) => c.status === "closed").length,
     };
     return [
       { id: "all", label: "همه", count: counts.all },
@@ -529,10 +534,13 @@ export default function ConversationsContainer() {
       { id: "answered", label: "پاسخ داده شده", count: counts.answered },
       { id: "closed", label: "بسته شده", count: counts.closed },
     ];
-  }, [conversations]);
+  }, [conversations, departmentFilter]);
 
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
+      if (departmentFilter && conv.departmentId !== departmentFilter) {
+        return false;
+      }
       if (activeFilter !== "all" && conv.status !== activeFilter) return false;
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -556,9 +564,8 @@ export default function ConversationsContainer() {
       }
       return true;
     });
-  }, [conversations, activeFilter, searchQuery]);
+  }, [conversations, activeFilter, searchQuery, departmentFilter]);
 
-  // ✅ اصلاح: فقط Socket با pendingMessageIds
   const handleSendMessage = useCallback(
     async (message: string) => {
       if (!selectedConversation || !message.trim() || isSending) return;
@@ -766,6 +773,34 @@ export default function ConversationsContainer() {
   }, [selectedConversation, showConfirm, showSuccess, showError]);
 
   useEffect(() => {
+    const departmentId = searchParams.get("departmentId");
+    if (departmentId) {
+      setDepartmentFilter(Number(departmentId));
+    } else {
+      setDepartmentFilter(null);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const teams = await api.get<any[]>("/support/team");
+        const filtered = (teams || [])
+          .filter((team: any) => team.deletedAt === null)
+          .map((team: any) => ({
+            id: team.id,
+            name: team.name,
+          }));
+        setDepartments(filtered);
+      } catch (error) {
+        console.error("❌ خطا در دریافت دپارتمان‌ها:", error);
+      }
+    };
+
+    fetchDepartments();
+  }, []);
+
+  useEffect(() => {
     const checkLayout = () => {
       const width = window.innerWidth;
       if (width < 768) setLayoutMode("mobile");
@@ -819,6 +854,9 @@ export default function ConversationsContainer() {
             role={role}
             isLoading={isLoading}
             currentUserName={currentUser?.userName || null}
+            departments={departments}
+            departmentFilter={departmentFilter}
+            onDepartmentFilterChange={setDepartmentFilter}
           />
         </div>
 
@@ -900,6 +938,9 @@ export default function ConversationsContainer() {
             role={role}
             isLoading={isLoading}
             currentUserName={currentUser?.userName || null}
+            departments={departments}
+            departmentFilter={departmentFilter}
+            onDepartmentFilterChange={setDepartmentFilter}
           />
         </div>
 
@@ -981,6 +1022,9 @@ export default function ConversationsContainer() {
           role={role}
           isLoading={isLoading}
           currentUserName={currentUser?.userName || null}
+          departments={departments}
+          departmentFilter={departmentFilter}
+          onDepartmentFilterChange={setDepartmentFilter}
         />
       )}
 

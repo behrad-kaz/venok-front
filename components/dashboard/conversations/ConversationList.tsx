@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, User, MessageSquare } from "lucide-react";
+import { Search, User, MessageSquare, Building2, Filter } from "lucide-react";
 import { Conversation, StatusFilter } from "./types";
 import { getStatusBadge } from "./data";
 import { UserRole } from "@/stores/useRoleStore";
@@ -19,7 +19,10 @@ interface ConversationListProps {
   isTablet?: boolean;
   role: UserRole;
   isLoading?: boolean;
-  currentUserName?: string | null; 
+  currentUserName?: string | null;
+  departments?: { id: number; name: string }[];
+  departmentFilter?: number | null;
+  onDepartmentFilterChange?: (departmentId: number | null) => void;
 }
 
 export default function ConversationList({
@@ -37,9 +40,12 @@ export default function ConversationList({
   role,
   isLoading = false,
   currentUserName = null,
+  departments = [],
+  departmentFilter,
+  onDepartmentFilterChange,
 }: ConversationListProps) {
   
-  // ✅ لاگ برای دیباگ (فقط در حالت توسعه)
+  // لاگ برای دیباگ
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     console.log('📦 [DEBUG] کل مکالمات دریافتی:', conversations?.length || 0);
     console.log('👤 [DEBUG] نقش فعلی کاربر:', role);
@@ -57,12 +63,15 @@ export default function ConversationList({
     }
   }
 
-  // ✅ فیلتر کردن گفتگوها بر اساس نقش و جستجو
+  // فیلتر کردن گفتگوها بر اساس نقش و جستجو
   const filteredConversations = (conversations || []).filter((conv) => {
-    // فیلتر وضعیت
+    // فیلتر بر اساس دپارتمان (برای مدیر کل)
+    if (role === "مدیر کل" && departmentFilter && conv.departmentId !== departmentFilter) {
+      return false;
+    }
+
     const matchesFilter = activeFilter === 'all' || conv.status === activeFilter;
 
-    // فیلتر جستجو
     const searchLower = searchQuery.toLowerCase().trim();
     if (searchLower) {
       const matchName = conv.customerName?.toLowerCase().includes(searchLower) || false;
@@ -96,7 +105,7 @@ export default function ConversationList({
   return (
     <div className="h-full flex flex-col rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] overflow-hidden transition-all duration-300">
       {/* جستجو */}
-      <div className="p-4 border-b border-[rgba(255,255,255,0.1)] flex-shrink-0">
+      <div className="p-4 border-b border-[rgba(255,255,255,0.1)] flex-shrink-0 space-y-3">
         <div className="relative">
           <input
             type="text"
@@ -107,6 +116,44 @@ export default function ConversationList({
           />
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
         </div>
+        
+        {/* ✅ فیلتر دپارتمان - فقط برای مدیر کل */}
+        {role === "مدیر کل" && departments.length > 0 && (
+          <div className="relative">
+            <select
+              value={departmentFilter || "all"}
+              onChange={(e) => {
+                const value = e.target.value;
+                onDepartmentFilterChange?.(value === "all" ? null : Number(value));
+              }}
+              className="w-full px-4 py-2.5 pr-10 rounded-xl text-sm bg-[#0D1B17] border border-[#59D8C3]/20 text-white focus:outline-none focus:border-[#59D8C3] transition-colors cursor-pointer appearance-none "
+            >
+              <option value="all">همه دپارتمان‌ها</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+          </div>
+        )}
+
+        {/* نمایش فیلتر فعال */}
+        {role === "مدیر کل" && departmentFilter && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">فیلتر:</span>
+            <span className="text-xs text-[#59D8C3] bg-[rgba(89,216,195,0.1)] px-2 py-0.5 rounded-full">
+              {departments.find(d => d.id === departmentFilter)?.name || 'نامشخص'}
+            </span>
+            <button
+              onClick={() => onDepartmentFilterChange?.(null)}
+              className="text-xs text-gray-500 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* فیلترهای وضعیت */}
@@ -150,12 +197,25 @@ export default function ConversationList({
                 هیچ گفتگویی به شما اختصاص داده نشده است
               </p>
             )}
+            {role === "مدیر کل" && departmentFilter && !searchQuery && (
+              <p className="text-gray-500 text-xs mt-1">
+                این دپارتمان هیچ گفتگوی فعالی ندارد
+              </p>
+            )}
             {searchQuery && (
               <button
                 onClick={() => onSearchChange('')}
                 className="mt-2 text-xs text-[#59D8C3] hover:text-[#6ef3dc] transition-colors"
               >
                 پاک کردن جستجو
+              </button>
+            )}
+            {role === "مدیر کل" && departmentFilter && (
+              <button
+                onClick={() => onDepartmentFilterChange?.(null)}
+                className="mt-1 text-xs text-[#59D8C3] hover:text-[#6ef3dc] transition-colors"
+              >
+                نمایش همه دپارتمان‌ها
               </button>
             )}
           </div>
@@ -186,7 +246,6 @@ export default function ConversationList({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="flex-1 min-w-0">
-                        {/* ✅ نمایش نام مشتری (از customerName که از بک‌اند می‌آید) */}
                         <h4 className="text-sm font-semibold text-white truncate">
                           {conv.customerName || 'مشتری ناشناس'}
                         </h4>
@@ -216,7 +275,6 @@ export default function ConversationList({
                             {conv.department}
                           </span>
                         )}
-                        {/* نمایش نام مسئول (assignee) */}
                         {conv.assignee && (
                           <span className="text-[10px] text-[#59D8C3] px-2 py-0.5 rounded-full bg-[rgba(89,216,195,0.08)]">
                             {conv.assignee}
