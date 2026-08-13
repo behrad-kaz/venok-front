@@ -7,6 +7,7 @@ import DepartmentDashboard from "@/components/dashboard/DepartmentDashboard";
 import { useRoleStore } from "@/stores/useRoleStore";
 import { authService } from "@/services/auth.service";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { useConversationTrend } from "@/hooks/useConversationTrend";
 
 // کامپوننت‌های جدید برای مدیر کل
 import StatsCards from "@/components/dashboard/admin/StatsCards";
@@ -42,6 +43,7 @@ export default function DashboardPage() {
   
   // ✅ استفاده از هوک آمار داینامیک
   const { stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats();
+  const { data: trendData, isLoading: trendLoading, error: trendError } = useConversationTrend();
 
   const savedRole = useSyncExternalStore(subscribeToLocalStorage, getSavedRole, () => null);
 
@@ -69,7 +71,7 @@ export default function DashboardPage() {
   }, [isLoading, role, router]);
 
   // نمایش لودینگ
-  if (isLoading || statsLoading) {
+  if (isLoading || statsLoading || trendLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#062723] to-[#020504] flex items-center justify-center">
         <div className="text-center">
@@ -120,6 +122,12 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {trendError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            خطا در دریافت روند گفتگوها: {trendError}
+          </div>
+        )}
+
         {stats && (
           <>
             <StatsCards 
@@ -133,7 +141,7 @@ export default function DashboardPage() {
             />
             <AttentionNeeded />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <ConversationTrend />
+              <ConversationTrend data={trendData} />
               <WorkspaceStatus />
             </div>
             <DepartmentsTable />

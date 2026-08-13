@@ -24,5 +24,6 @@ export interface MemberPerformance {
 export interface TrendData {
   day: string;
   new: number;
-  solved: number;
+  open: number;
+  closed: number;
 }

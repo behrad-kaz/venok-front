@@ -38,11 +38,11 @@ export const recentConversations: RecentConversation[] = [
 ];
 
 export const trendData: TrendData[] = [
-  { day: "شنبه", new: 8, solved: 6 },
-  { day: "یکشنبه", new: 12, solved: 10 },
-  { day: "دوشنبه", new: 15, solved: 13 },
-  { day: "سه‌شنبه", new: 10, solved: 11 },
-  { day: "چهارشنبه", new: 14, solved: 12 },
-  { day: "پنجشنبه", new: 11, solved: 10 },
-  { day: "امروز", new: 18, solved: 8 },
+  { day: "شنبه", new: 8, open: 5, closed: 3 },
+  { day: "یکشنبه", new: 12, open: 7, closed: 5 },
+  { day: "دوشنبه", new: 15, open: 8, closed: 7 },
+  { day: "سه‌شنبه", new: 10, open: 6, closed: 4 },
+  { day: "چهارشنبه", new: 14, open: 9, closed: 5 },
+  { day: "پنجشنبه", new: 11, open: 7, closed: 4 },
+  { day: "امروز", new: 18, open: 10, closed: 8 },
 ];

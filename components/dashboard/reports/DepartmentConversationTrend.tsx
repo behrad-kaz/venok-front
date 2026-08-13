@@ -7,28 +7,28 @@ interface DepartmentConversationTrendProps {
   data?: {
     day: string;
     new: number;
-    solved: number;
+    open: number;
+    closed: number;
   }[];
 }
 
 // داده‌های استاتیک پیش‌فرض
 const defaultData = [
-  { day: "شنبه", new: 12, solved: 8 },
-  { day: "یکشنبه", new: 15, solved: 11 },
-  { day: "دوشنبه", new: 10, solved: 9 },
-  { day: "سه‌شنبه", new: 18, solved: 14 },
-  { day: "چهارشنبه", new: 14, solved: 12 },
-  { day: "پنجشنبه", new: 16, solved: 10 },
-  { day: "جمعه", new: 20, solved: 15 },
+  { day: "شنبه", new: 12, open: 8, closed: 4 },
+  { day: "یکشنبه", new: 15, open: 10, closed: 5 },
+  { day: "دوشنبه", new: 10, open: 7, closed: 3 },
+  { day: "سه‌شنبه", new: 18, open: 12, closed: 6 },
+  { day: "چهارشنبه", new: 14, open: 9, closed: 5 },
+  { day: "پنجشنبه", new: 16, open: 11, closed: 5 },
+  { day: "جمعه", new: 20, open: 14, closed: 6 },
 ];
 
-const maxValue = 45; 
+const maxValue = Math.max(...defaultData.map(d => Math.max(d.new, d.open, d.closed)), 1); 
 
 export default function DepartmentConversationTrend({ data = defaultData }: DepartmentConversationTrendProps) {
   const [hoveredBar, setHoveredBar] = useState<{ day: string; type: string; value: number } | null>(null);
 
   const getBarHeight = (value: number) => {
-    // محاسبه درصد و محدود کردن به حداکثر 95%
     const percentage = (value / maxValue) * 100;
     return Math.min(percentage, 95);
   };
@@ -54,15 +54,25 @@ export default function DepartmentConversationTrend({ data = defaultData }: Depa
                   className="w-full rounded-t-lg bg-[rgba(89,216,195,0.3)] border-t-2 border-[#59D8C3] transition-all hover:bg-[rgba(89,216,195,0.4)] cursor-pointer"
                   style={{ height: `${getBarHeight(item.new)}%` }}
                 />
-                {/* نوار گفتگوهای حل‌شده */}
+                {/* نوار گفتگوهای باز */}
                 <motion.div
                   initial={{ height: 0 }}
-                  animate={{ height: `${getBarHeight(item.solved)}%` }}
+                  animate={{ height: `${getBarHeight(item.open)}%` }}
                   transition={{ duration: 0.5, delay: idx * 0.05 }}
-                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "حل‌شده", value: item.solved })}
+                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "باز", value: item.open })}
+                  onMouseLeave={() => setHoveredBar(null)}
+                  className="w-full rounded-t-lg bg-[rgba(242,184,75,0.3)] border-t-2 border-[#F2B84B] transition-all hover:bg-[rgba(242,184,75,0.4)] cursor-pointer"
+                  style={{ height: `${getBarHeight(item.open)}%` }}
+                />
+                {/* نوار گفتگوهای بسته */}
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: `${getBarHeight(item.closed)}%` }}
+                  transition={{ duration: 0.5, delay: idx * 0.05 }}
+                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "بسته", value: item.closed })}
                   onMouseLeave={() => setHoveredBar(null)}
                   className="w-full rounded-t-lg bg-[rgba(91,224,168,0.3)] border-t-2 border-[#5BE0A8] transition-all hover:bg-[rgba(91,224,168,0.4)] cursor-pointer"
-                  style={{ height: `${getBarHeight(item.solved)}%` }}
+                  style={{ height: `${getBarHeight(item.closed)}%` }}
                 />
               </div>
               {/* برچسب روز */}
@@ -96,8 +106,12 @@ export default function DepartmentConversationTrend({ data = defaultData }: Depa
           <span className="text-xs text-gray-500">گفتگوهای جدید</span>
         </div>
         <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-[#F2B84B]" />
+          <span className="text-xs text-gray-500">گفتگوهای باز</span>
+        </div>
+        <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded bg-[#5BE0A8]" />
-          <span className="text-xs text-gray-500">گفتگوهای حل‌شده</span>
+          <span className="text-xs text-gray-500">گفتگوهای بسته</span>
         </div>
       </div>
     </div>

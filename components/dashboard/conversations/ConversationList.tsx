@@ -189,11 +189,6 @@ export default function ConversationList({
                         {/* ✅ نمایش نام مشتری (از customerName که از بک‌اند می‌آید) */}
                         <h4 className="text-sm font-semibold text-white truncate">
                           {conv.customerName || 'مشتری ناشناس'}
-                          {conv.customerId && (
-                            <span className="text-[10px] text-gray-500 mr-1">
-                              (ID: {conv.customerId})
-                            </span>
-                          )}
                         </h4>
                         <p className="text-xs text-gray-500 truncate">
                           {conv.subject || 'بدون موضوع'}
@@ -233,7 +228,7 @@ export default function ConversationList({
                           </span>
                         )}
                       </div>
-                      {conv.unreadCount && conv.unreadCount > 0 && (
+                      {conv.unreadCount > 0 && (
                         <span className="w-5 h-5 rounded-full bg-[#f2b84b] text-[#1c1302] text-[10px] font-bold flex items-center justify-center flex-shrink-0">
                           {conv.unreadCount}
                         </span>

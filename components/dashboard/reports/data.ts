@@ -32,13 +32,13 @@ export const statusDistribution = {
 };
 
 export const trendData: TrendData[] = [
-  { day: "شنبه", new: 12, solved: 8 },
-  { day: "یکشنبه", new: 15, solved: 11 },
-  { day: "دوشنبه", new: 10, solved: 9 },
-  { day: "سه‌شنبه", new: 18, solved: 14 },
-  { day: "چهارشنبه", new: 14, solved: 12 },
-  { day: "پنجشنبه", new: 16, solved: 10 },
-  { day: "جمعه", new: 20, solved: 15 },
+  { day: "شنبه", new: 12, open: 8, closed: 4 },
+  { day: "یکشنبه", new: 15, open: 10, closed: 5 },
+  { day: "دوشنبه", new: 10, open: 7, closed: 3 },
+  { day: "سه‌شنبه", new: 18, open: 12, closed: 6 },
+  { day: "چهارشنبه", new: 14, open: 9, closed: 5 },
+  { day: "پنجشنبه", new: 16, open: 11, closed: 5 },
+  { day: "جمعه", new: 20, open: 14, closed: 6 },
 ];
 
 export const topTopics = [

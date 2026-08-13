@@ -8,12 +8,12 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { memo, useMemo } from "react";
 
 function AttentionNeededComponent() {
-  const { notifications, isLoading } = useNotifications();
+  const { notifications, isLoading, markAsRead } = useNotifications();
 
   // ✅ استفاده از useMemo برای جلوگیری از محاسبات مجدد در هر رندر
   const attentionItems = useMemo(() => {
     return notifications
-      .filter(n => n.type === 'warning' || n.type === 'danger')
+      .filter(n => !n.isRead && (n.type === 'warning' || n.type === 'danger'))
       .slice(0, 4)
       .map(n => ({
         id: n.id,
@@ -82,10 +82,11 @@ function AttentionNeededComponent() {
       {/* ✅ استفاده از AnimatePresence با کلید unique برای مدیریت انیمیشن */}
       <div className="space-y-2">
         <AnimatePresence initial={false}>
-          {attentionItems.map((item, index) => (
+          {attentionItems.map((item) => (
             <div
               key={item.id}
-              className="flex items-start gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+              onClick={() => markAsRead(item.id)}
+              className="flex items-start gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)] transition-colors cursor-pointer"
             >
               <div
                 className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -109,6 +110,10 @@ function AttentionNeededComponent() {
                 <p className="text-xs text-gray-500 mb-2">{item.description}</p>
                 <Link
                   href={item.buttonLink}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    markAsRead(item.id);
+                  }}
                   className="text-xs text-[#59D8C3] hover:text-[#6ef3dc] font-medium transition-colors inline-flex items-center gap-1"
                 >
                   {item.buttonText} ←

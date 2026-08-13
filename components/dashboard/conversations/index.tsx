@@ -44,6 +44,35 @@ export default function ConversationsContainer() {
   const isInitialized = useRef(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false);
+  const lastReadTimestamps = useRef<Map<number, number>>(new Map());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem('conversationLastReadTimestamps');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const map = new Map<number, number>();
+        if (Array.isArray(parsed)) {
+          parsed.forEach(([key, value]) => {
+            map.set(Number(key), Number(value));
+          });
+        }
+        lastReadTimestamps.current = map;
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const persistLastReadTimestamps = useCallback((map: Map<number, number>) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('conversationLastReadTimestamps', JSON.stringify(Array.from(map.entries())));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const isAdmin = role === "مدیر کل";
   const isManager = role === "مدیر";
@@ -80,6 +109,13 @@ export default function ConversationsContainer() {
   }, [isAdmin, userStaffInfo, assignableEmployees]);
 
   // ✅ اصلاح: فقط پیام‌های جدید از Socket را اضافه کن
+  const calculateUnreadCount = useCallback((messages: any[], conversationId: number) => {
+    const lastReadAt = lastReadTimestamps.current.get(conversationId) || 0;
+    return messages.filter(
+      (msg) => msg.senderType === "customer" && new Date(msg.createdAt || 0).getTime() > lastReadAt
+    ).length;
+  }, []);
+
   const handleNewMessage = useCallback((message: any) => {
     console.log("📩 پیام جدید از Socket:", message);
 
@@ -144,11 +180,17 @@ export default function ConversationsContainer() {
         return dateA - dateB;
       });
 
+      if (prev.id === convId) {
+        lastReadTimestamps.current.set(convId, Date.now());
+        persistLastReadTimestamps(lastReadTimestamps.current);
+      }
+
       return {
         ...prev,
         messages: updatedMessages,
-        lastMessage: message.text,
+        lastMessage: newMsg.text,
         time: "همین الان",
+        unreadCount: 0,
       };
     });
 
@@ -199,12 +241,13 @@ export default function ConversationsContainer() {
         return {
           ...conv,
           messages: updatedMessages,
-          lastMessage: message.text,
+          lastMessage: newMsg.text,
           time: "همین الان",
+          unreadCount: calculateUnreadCount(updatedMessages, conv.id),
         };
       }),
     );
-  }, [currentUser, selectedConversation]);
+  }, [currentUser, selectedConversation, calculateUnreadCount, persistLastReadTimestamps]);
 
   const { isConnected, socketRef } = useSocket({
     apiBaseUrl: config.apiBaseUrl,
@@ -355,6 +398,36 @@ export default function ConversationsContainer() {
         const customerName =
           conv.customer?.name || conv.customerName || "مشتری ناشناس";
 
+        const mappedMessages = (conv.messages || [])
+          .slice()
+          .sort((a: any, b: any) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateA - dateB;
+          })
+          .map((msg: any) => ({
+            id: msg.id,
+            senderName:
+              msg.senderName ||
+              (msg.senderType === "customer" ? "مشتری" : "پشتیبانی"),
+            text: msg.content,
+            time: msg.createdAt
+              ? new Date(msg.createdAt).toLocaleTimeString("fa-IR")
+              : "",
+            isSupport:
+              msg.senderType === "agent" ||
+              msg.senderType === "support" ||
+              msg.senderType === "admin",
+            isInternal: msg.isInternalNote || false,
+            senderType: msg.senderType || "customer",
+            senderId: msg.senderId ?? null,
+            fileUrl: msg.fileUrl || null,
+            fileType: msg.fileType || null,
+            createdAt: msg.createdAt,
+          }));
+
+        const unreadCount = calculateUnreadCount(mappedMessages, conv.id);
+
         return {
           id: conv.id,
           customerName: customerName,
@@ -363,8 +436,7 @@ export default function ConversationsContainer() {
           customerInitial: customerName.charAt(0) || "م",
           customerPhone: conv.customerPhone || "نامشخص",
           subject: conv.subject || "بدون موضوع",
-          lastMessage:
-            conv.messages?.[conv.messages.length - 1]?.content || "بدون پیام",
+          lastMessage: mappedMessages[mappedMessages.length - 1]?.text || "بدون پیام",
           time: conv.lastActivity
             ? new Date(conv.lastActivity).toLocaleString("fa-IR")
             : "چند لحظه پیش",
@@ -378,34 +450,8 @@ export default function ConversationsContainer() {
             ? new Date(conv.createdAt).toLocaleDateString("fa-IR")
             : "",
           priority: conv.priority || "normal",
-          unreadCount: conv.unreadCount || 0,
-          messages: (conv.messages || [])
-            .slice()
-            .sort((a: any, b: any) => {
-              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return dateA - dateB;
-            })
-            .map((msg: any) => ({
-              id: msg.id,
-              senderName:
-                msg.senderName ||
-                (msg.senderType === "customer" ? "مشتری" : "پشتیبانی"),
-              text: msg.content,
-              time: msg.createdAt
-                ? new Date(msg.createdAt).toLocaleTimeString("fa-IR")
-                : "",
-              isSupport:
-                msg.senderType === "agent" ||
-                msg.senderType === "support" ||
-                msg.senderType === "admin",
-              isInternal: msg.isInternalNote || false,
-              senderType: msg.senderType || "customer",
-              senderId: msg.senderId ?? null,
-              fileUrl: msg.fileUrl || null,
-              fileType: msg.fileType || null,
-              createdAt: msg.createdAt,
-            })),
+          unreadCount,
+          messages: mappedMessages,
           createdAt: conv.createdAt,
           updatedAt: conv.updatedAt,
         };
@@ -423,7 +469,7 @@ export default function ConversationsContainer() {
       setIsLoading(false);
       isLoadingRef.current = false;
     }
-  }, [selectedConversation, showError, role, userStaffInfo, isAdmin]);
+  }, [selectedConversation, showError, role, userStaffInfo, isAdmin, calculateUnreadCount]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -565,8 +611,19 @@ export default function ConversationsContainer() {
       if (layoutMode === "mobile" || layoutMode === "tablet") {
         setViewMode("chat");
       }
+      const now = Date.now();
+      lastReadTimestamps.current.set(conversation.id, now);
+      persistLastReadTimestamps(lastReadTimestamps.current);
+
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversation.id
+            ? { ...conv, unreadCount: 0 }
+            : conv,
+        ),
+      );
     },
-    [layoutMode],
+    [layoutMode, persistLastReadTimestamps],
   );
 
   const handleAssignConversation = useCallback(

@@ -7,14 +7,15 @@ interface ConversationTrendProps {
   data: {
     day: string;
     new: number;
-    solved: number;
+    open: number;
+    closed: number;
   }[];
 }
 
 export default function ConversationTrend({ data }: ConversationTrendProps) {
   const [hoveredBar, setHoveredBar] = useState<{ day: string; type: string; value: number } | null>(null);
 
-  const maxValue = 20;
+  const maxValue = Math.max(...data.map(d => Math.max(d.new, d.open, d.closed)), 1);
   const getBarHeight = (value: number) => (value / maxValue) * 100;
 
   return (
@@ -36,15 +37,25 @@ export default function ConversationTrend({ data }: ConversationTrendProps) {
                   className="w-full rounded-t-lg bg-[rgba(89,216,195,0.3)] border-t-2 border-[#59D8C3] transition-all hover:bg-[rgba(89,216,195,0.4)] cursor-pointer"
                   style={{ height: `${getBarHeight(item.new)}%` }}
                 />
-                {/* نوار گفتگوهای حل‌شده */}
+                {/* نوار گفتگوهای باز */}
                 <motion.div
                   initial={{ height: 0 }}
-                  animate={{ height: `${getBarHeight(item.solved)}%` }}
+                  animate={{ height: `${getBarHeight(item.open)}%` }}
                   transition={{ duration: 0.5, delay: idx * 0.05 }}
-                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "حل‌شده", value: item.solved })}
+                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "باز", value: item.open })}
+                  onMouseLeave={() => setHoveredBar(null)}
+                  className="w-full rounded-t-lg bg-[rgba(242,184,75,0.3)] border-t-2 border-[#F2B84B] transition-all hover:bg-[rgba(242,184,75,0.4)] cursor-pointer"
+                  style={{ height: `${getBarHeight(item.open)}%` }}
+                />
+                {/* نوار گفتگوهای بسته */}
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: `${getBarHeight(item.closed)}%` }}
+                  transition={{ duration: 0.5, delay: idx * 0.05 }}
+                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "بسته", value: item.closed })}
                   onMouseLeave={() => setHoveredBar(null)}
                   className="w-full rounded-t-lg bg-[rgba(91,224,168,0.3)] border-t-2 border-[#5BE0A8] transition-all hover:bg-[rgba(91,224,168,0.4)] cursor-pointer"
-                  style={{ height: `${getBarHeight(item.solved)}%` }}
+                  style={{ height: `${getBarHeight(item.closed)}%` }}
                 />
               </div>
               <span className="text-[10px] text-gray-500">{item.day}</span>
@@ -77,8 +88,12 @@ export default function ConversationTrend({ data }: ConversationTrendProps) {
           <span className="text-xs text-gray-500">گفتگوهای جدید</span>
         </div>
         <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-[#F2B84B]" />
+          <span className="text-xs text-gray-500">گفتگوهای باز</span>
+        </div>
+        <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded bg-[#5BE0A8]" />
-          <span className="text-xs text-gray-500">گفتگوهای حل‌شده</span>
+          <span className="text-xs text-gray-500">گفتگوهای بسته</span>
         </div>
       </div>
     </div>
