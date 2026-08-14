@@ -59,12 +59,6 @@ interface RecentConversation {
   isUrgent: boolean;
 }
 
-interface TrendData {
-  day: string;
-  new: number;
-  open: number;
-  closed: number;
-}
 
 export default function DepartmentDashboard() {
   const router = useRouter();
@@ -90,7 +84,7 @@ export default function DepartmentDashboard() {
     closedToday: 0,
   });
   
-  const [trendData, setTrendData] = useState<TrendData[]>([]);
+
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
 
   // تابع محاسبه زمان نسبی
@@ -331,36 +325,6 @@ export default function DepartmentDashboard() {
       // ============ اعضای دپارتمان ============
       // MembersTable خودش داده‌های اعضا را از API می‌گیرد
 
-      // ============ روند گفتگوها (۷ روز گذشته) ============
-      const dayNames = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه'];
-      const trend: TrendData[] = [];
-      const nowDate = new Date();
-      nowDate.setHours(0, 0, 0, 0);
-
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(nowDate);
-        date.setDate(date.getDate() - i);
-        const dayName = i === 0 ? 'امروز' : dayNames[date.getDay()];
-        const dateKey = date.toISOString().split('T')[0];
-        
-        const dayConvs = deptConversations.filter((conv: any) => {
-          if (!conv.createdAt) return false;
-          const createdDate = new Date(conv.createdAt);
-          const createdDateStr = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}-${String(createdDate.getDate()).padStart(2, '0')}`;
-          return createdDateStr === dateKey;
-        });
-        
-        // محاسبه تعداد بسته شده‌ها
-        const closedCount = dayConvs.filter((conv: any) => conv.status === "closed").length;
-        
-        trend.push({
-          day: dayName,
-          new: dayConvs.length,
-          open: dayConvs.filter((c: any) => c.status !== "closed").length,
-          closed: closedCount,
-        });
-      }
-      setTrendData(trend);
 
       // ============ آخرین گفتگوهای مهم ============
       const recent = deptConversations
@@ -451,7 +415,7 @@ export default function DepartmentDashboard() {
       <MembersTable departmentId={departmentId} />
 
       {/* روند گفتگوهای دپارتمان */}
-      <ConversationTrend data={trendData} />
+      <ConversationTrend />
 
       {/* گفتگوهای مهم اخیر */}
       <RecentConversations conversations={recentConversations} />

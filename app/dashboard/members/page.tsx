@@ -138,12 +138,6 @@ export default function MembersPage() {
     return true;
   });
 
-  const deptStats = {
-    totalMembers: filteredDeptMembers.length,
-    onlineMembers: filteredDeptMembers.filter(m => m.presence === "online").length,
-    totalOpenTickets: filteredDeptMembers.reduce((sum, m) => sum + m.openTickets, 0),
-    membersWithTickets: filteredDeptMembers.filter(m => m.openTickets > 0).length,
-  };
 
   const openEditSidebar = (member: Member) => {
     setEditingMember(member);
@@ -257,7 +251,7 @@ export default function MembersPage() {
               </div>
             </div>
 
-            <DepartmentStatsCards stats={deptStats} />
+            <DepartmentStatsCards />
 
             <div className="space-y-4">
               {filteredDeptMembers.map((member, index) => (
