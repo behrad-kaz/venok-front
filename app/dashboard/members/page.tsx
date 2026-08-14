@@ -14,6 +14,7 @@ import MemberCard from "@/components/dashboard/members/MemberCard";
 import MemberSidebar from "@/components/dashboard/members/MemberSidebar";
 import DepartmentMemberCard from "@/components/dashboard/members/DepartmentMemberCard";
 import DepartmentStatsCards from "@/components/dashboard/members/DepartmentStatsCards";
+import MemberRequestModal from "@/components/dashboard/members/MemberRequestModal";
 import { useMembers } from "@/components/dashboard/members/hooks/useMembers";
 import { authService } from "@/services/auth.service";
 import { api } from "@/services/api-client";
@@ -42,6 +43,7 @@ export default function MembersPage() {
   const [selectedPresence, setSelectedPresence] = useState("all");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [isMemberRequestOpen, setIsMemberRequestOpen] = useState(false);
   
   // ✅ دریافت departmentId کاربر جاری از localStorage
   const [currentUserDepartmentId, setCurrentUserDepartmentId] = useState<number | null>(null);
@@ -206,7 +208,10 @@ export default function MembersPage() {
                 />
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               </div>
-              <button className="px-4 py-2.5 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all whitespace-nowrap">
+              <button
+                onClick={() => setIsMemberRequestOpen(true)}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-[rgba(255,255,255,0.03)] text-gray-500 border border-[rgba(255,255,255,0.1)] hover:text-white hover:border-[rgba(255,255,255,0.2)] transition-all whitespace-nowrap"
+              >
                 درخواست تغییر عضو از مدیرکل
               </button>
             </div>
@@ -265,6 +270,14 @@ export default function MembersPage() {
                 <p className="text-gray-400">هیچ عضوی در این دپارتمان یافت نشد</p>
               </div>
             )}
+
+            <MemberRequestModal
+              isOpen={isMemberRequestOpen}
+              onClose={() => setIsMemberRequestOpen(false)}
+              members={filteredDeptMembers}
+              departmentName={managerDepartmentName}
+              managerName={currentUserDepartmentName || authService.getStaffName() || "مدیر دپارتمان"}
+            />
           </div>
         </DashboardLayout>
       </RoleGuard>
