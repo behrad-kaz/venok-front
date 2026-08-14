@@ -90,7 +90,6 @@ export default function DepartmentDashboard() {
     closedToday: 0,
   });
   
-  const [members, setMembers] = useState<DepartmentMember[]>([]);
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
 
@@ -330,29 +329,7 @@ export default function DepartmentDashboard() {
       });
 
       // ============ اعضای دپارتمان ============
-      const memberList: DepartmentMember[] = deptStaffs.map((staff: any) => {
-        const staffConversations = deptConversations.filter(
-          (conv: any) => conv.agentId === staff.id && conv.status !== "closed"
-        );
-        const openTicketsCount = staffConversations.length;
-        
-        const staffAnswered = deptConversations.filter(
-          (conv: any) => conv.agentId === staff.id && (conv.status === "answered" || conv.status === "closed")
-        );
-        const staffAvgTime = calculateAvgResponseTime(staffAnswered);
-        
-        return {
-          id: staff.id,
-          name: staff.name,
-          initial: staff.name.charAt(0),
-          status: staff.lastOnlineAt ? "online" : "offline",
-          openTickets: openTicketsCount,
-          avgResponseTime: staffAvgTime,
-          lastActivity: staff.lastOnlineAt ? getTimeAgo(staff.lastOnlineAt) : "نامشخص",
-          workStatus: openTicketsCount > 3 ? "busy" : "normal",
-        };
-      });
-      setMembers(memberList);
+      // MembersTable خودش داده‌های اعضا را از API می‌گیرد
 
       // ============ روند گفتگوها (۷ روز گذشته) ============
       const dayNames = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه'];
@@ -471,7 +448,7 @@ export default function DepartmentDashboard() {
       <QueueStatus status={queueStatus} />
 
       {/* وضعیت اعضای دپارتمان */}
-      <MembersTable members={members} />
+      <MembersTable departmentId={departmentId} />
 
       {/* روند گفتگوهای دپارتمان */}
       <ConversationTrend data={trendData} />

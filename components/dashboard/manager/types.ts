@@ -32,6 +32,7 @@ export interface DepartmentMember {
   avgResponseTime: string;
   lastActivity: string;
   workStatus: "busy" | "normal";
+  closedTickets?: number;
 }
 
 export interface RecentConversation {

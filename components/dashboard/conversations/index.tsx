@@ -43,6 +43,7 @@ export default function ConversationsContainer() {
   } | null>(null);
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
   const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
+  const [memberFilter, setMemberFilter] = useState<number | null>(null);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -345,7 +346,11 @@ export default function ConversationsContainer() {
           role: staff.role,
         }));
 
-      setAssignableEmployees(mapped);
+      const filteredMapped = isManager && userStaffInfo?.departmentId
+        ? mapped.filter((emp) => emp.departmentId === userStaffInfo.departmentId)
+        : mapped;
+
+      setAssignableEmployees(filteredMapped);
 
       if (isManager && userStaffInfo?.departmentId) {
         const userDept = mapped.find(
@@ -393,6 +398,10 @@ export default function ConversationsContainer() {
             convs = [];
           }
         }
+      }
+
+      if (memberFilter !== null) {
+        convs = convs.filter((conv: any) => conv.agentId === memberFilter);
       }
 
       const formatted = convs.map((conv: any) => {
@@ -541,6 +550,9 @@ export default function ConversationsContainer() {
       if (departmentFilter && conv.departmentId !== departmentFilter) {
         return false;
       }
+      if (memberFilter !== null && conv.assigneeId !== memberFilter) {
+        return false;
+      }
       if (activeFilter !== "all" && conv.status !== activeFilter) return false;
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -564,7 +576,7 @@ export default function ConversationsContainer() {
       }
       return true;
     });
-  }, [conversations, activeFilter, searchQuery, departmentFilter]);
+  }, [conversations, activeFilter, searchQuery, departmentFilter, memberFilter]);
 
   const handleSendMessage = useCallback(
     async (message: string) => {
@@ -782,6 +794,15 @@ export default function ConversationsContainer() {
   }, [searchParams]);
 
   useEffect(() => {
+    const memberId = searchParams.get("member");
+    if (memberId) {
+      setMemberFilter(Number(memberId));
+    } else {
+      setMemberFilter(null);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     const fetchDepartments = async () => {
       try {
         const teams = await api.get<any[]>("/support/team");
@@ -857,6 +878,9 @@ export default function ConversationsContainer() {
             departments={departments}
             departmentFilter={departmentFilter}
             onDepartmentFilterChange={setDepartmentFilter}
+            memberFilter={memberFilter}
+            onMemberFilterChange={setMemberFilter}
+            assignableEmployees={assignableEmployees}
           />
         </div>
 
@@ -941,6 +965,9 @@ export default function ConversationsContainer() {
             departments={departments}
             departmentFilter={departmentFilter}
             onDepartmentFilterChange={setDepartmentFilter}
+            memberFilter={memberFilter}
+            onMemberFilterChange={setMemberFilter}
+            assignableEmployees={assignableEmployees}
           />
         </div>
 
@@ -1025,6 +1052,9 @@ export default function ConversationsContainer() {
           departments={departments}
           departmentFilter={departmentFilter}
           onDepartmentFilterChange={setDepartmentFilter}
+          memberFilter={memberFilter}
+          onMemberFilterChange={setMemberFilter}
+          assignableEmployees={assignableEmployees}
         />
       )}
 

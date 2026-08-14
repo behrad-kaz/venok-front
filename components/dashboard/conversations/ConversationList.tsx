@@ -23,6 +23,9 @@ interface ConversationListProps {
   departments?: { id: number; name: string }[];
   departmentFilter?: number | null;
   onDepartmentFilterChange?: (departmentId: number | null) => void;
+  memberFilter?: number | null;
+  onMemberFilterChange?: (memberId: number | null) => void;
+  assignableEmployees?: { id: number; name: string }[];
 }
 
 export default function ConversationList({
@@ -43,6 +46,9 @@ export default function ConversationList({
   departments = [],
   departmentFilter,
   onDepartmentFilterChange,
+  memberFilter,
+  onMemberFilterChange,
+  assignableEmployees = [],
 }: ConversationListProps) {
   
   // لاگ برای دیباگ
@@ -65,8 +71,11 @@ export default function ConversationList({
 
   // فیلتر کردن گفتگوها بر اساس نقش و جستجو
   const filteredConversations = (conversations || []).filter((conv) => {
-    // فیلتر بر اساس دپارتمان (برای مدیر کل)
     if (role === "مدیر کل" && departmentFilter && conv.departmentId !== departmentFilter) {
+      return false;
+    }
+
+    if (memberFilter !== null && conv.assigneeId !== memberFilter) {
       return false;
     }
 
@@ -136,6 +145,28 @@ export default function ConversationList({
               ))}
             </select>
             <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+          </div>
+        )}
+
+        {/* ✅ فیلتر عضو - برای مدیر کل و مدیر دپارتمان */}
+        {(role === "مدیر کل" || role === "مدیر") && assignableEmployees.length > 0 && (
+          <div className="relative">
+            <select
+              value={memberFilter || "all"}
+              onChange={(e) => {
+                const value = e.target.value;
+                onMemberFilterChange?.(value === "all" ? null : Number(value));
+              }}
+              className="w-full px-4 py-2.5 pr-10 rounded-xl text-sm bg-[#0D1B17] border border-[#59D8C3]/20 text-white focus:outline-none focus:border-[#59D8C3] transition-colors cursor-pointer appearance-none "
+            >
+              <option value="all">همه اعضا</option>
+              {assignableEmployees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name}
+                </option>
+              ))}
+            </select>
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
           </div>
         )}
 
