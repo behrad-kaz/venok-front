@@ -1,7 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { useReportsData } from "./hooks/useReportsData";
 
 interface DepartmentConversationTrendProps {
   data?: {
@@ -12,21 +13,47 @@ interface DepartmentConversationTrendProps {
   }[];
 }
 
-// داده‌های استاتیک پیش‌فرض
-const defaultData = [
-  { day: "شنبه", new: 12, open: 8, closed: 4 },
-  { day: "یکشنبه", new: 15, open: 10, closed: 5 },
-  { day: "دوشنبه", new: 10, open: 7, closed: 3 },
-  { day: "سه‌شنبه", new: 18, open: 12, closed: 6 },
-  { day: "چهارشنبه", new: 14, open: 9, closed: 5 },
-  { day: "پنجشنبه", new: 16, open: 11, closed: 5 },
-  { day: "جمعه", new: 20, open: 14, closed: 6 },
-];
-
-const maxValue = Math.max(...defaultData.map(d => Math.max(d.new, d.open, d.closed)), 1); 
-
-export default function DepartmentConversationTrend({ data = defaultData }: DepartmentConversationTrendProps) {
+export default function DepartmentConversationTrend({ data: propData }: DepartmentConversationTrendProps) {
+  const { trendData: hookData, isLoading } = useReportsData();
+  const data = propData || hookData;
   const [hoveredBar, setHoveredBar] = useState<{ day: string; type: string; value: number } | null>(null);
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <h3 className="text-sm font-bold text-white mb-4">روند گفتگوهای دپارتمان</h3>
+        <div className="h-52 flex items-end justify-between gap-2">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-2">
+              <div className="w-full flex items-end justify-center gap-1 h-[140px]">
+                {[1, 2, 3].map((j) => (
+                  <div
+                    key={j}
+                    className="w-full rounded-t-lg bg-[rgba(255,255,255,0.03)] animate-pulse"
+                    style={{ height: `${Math.max(20, Math.random() * 80)}%` }}
+                  />
+                ))}
+              </div>
+              <div className="h-3 w-6 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <h3 className="text-sm font-bold text-white mb-4">روند گفتگوهای دپارتمان</h3>
+        <div className="h-52 flex items-center justify-center">
+          <p className="text-xs text-gray-500">داده‌ای برای نمایش وجود ندارد</p>
+        </div>
+      </div>
+    );
+  }
+
+  const maxValue = Math.max(...data.map(d => Math.max(d.new, d.open, d.closed)), 1);
 
   const getBarHeight = (value: number) => {
     const percentage = (value / maxValue) * 100;
@@ -38,13 +65,10 @@ export default function DepartmentConversationTrend({ data = defaultData }: Depa
       <h3 className="text-sm font-bold text-white mb-4">روند گفتگوهای دپارتمان</h3>
 
       <div className="relative">
-        {/* نمودار - ارتفاع ثابت 200px */}
         <div className="h-52 flex items-end justify-between gap-2">
           {data.map((item, idx) => (
             <div key={item.day} className="flex-1 flex flex-col items-center gap-2">
-              {/* محفظه نوارها - ارتفاع ثابت 140px */}
               <div className="w-full h-[140px] flex items-end justify-center gap-1">
-                {/* نوار گفتگوهای جدید */}
                 <motion.div
                   initial={{ height: 0 }}
                   animate={{ height: `${getBarHeight(item.new)}%` }}
@@ -54,7 +78,6 @@ export default function DepartmentConversationTrend({ data = defaultData }: Depa
                   className="w-full rounded-t-lg bg-[rgba(89,216,195,0.3)] border-t-2 border-[#59D8C3] transition-all hover:bg-[rgba(89,216,195,0.4)] cursor-pointer"
                   style={{ height: `${getBarHeight(item.new)}%` }}
                 />
-                {/* نوار گفتگوهای باز */}
                 <motion.div
                   initial={{ height: 0 }}
                   animate={{ height: `${getBarHeight(item.open)}%` }}
@@ -64,7 +87,6 @@ export default function DepartmentConversationTrend({ data = defaultData }: Depa
                   className="w-full rounded-t-lg bg-[rgba(242,184,75,0.3)] border-t-2 border-[#F2B84B] transition-all hover:bg-[rgba(242,184,75,0.4)] cursor-pointer"
                   style={{ height: `${getBarHeight(item.open)}%` }}
                 />
-                {/* نوار گفتگوهای بسته */}
                 <motion.div
                   initial={{ height: 0 }}
                   animate={{ height: `${getBarHeight(item.closed)}%` }}
@@ -75,13 +97,11 @@ export default function DepartmentConversationTrend({ data = defaultData }: Depa
                   style={{ height: `${getBarHeight(item.closed)}%` }}
                 />
               </div>
-              {/* برچسب روز */}
               <span className="text-[10px] text-gray-500">{item.day}</span>
             </div>
           ))}
         </div>
 
-        {/* Tooltip */}
         {hoveredBar && (
           <div
             className="absolute bg-[#0D1B17] border border-[#59D8C3]/30 rounded-lg px-3 py-1.5 shadow-lg z-50 text-center whitespace-nowrap"
@@ -99,7 +119,6 @@ export default function DepartmentConversationTrend({ data = defaultData }: Depa
         )}
       </div>
 
-      {/* راهنما */}
       <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-[rgba(255,255,255,0.1)]">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded bg-[#59D8C3]" />

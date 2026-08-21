@@ -3,9 +3,10 @@
 
 import { motion } from "framer-motion";
 import { MessageCircle, CheckCircle, Clock, TrendingUp } from "lucide-react";
+import { useReportsData } from "./hooks/useReportsData";
 
 interface ReportCardsProps {
-  stats: {
+  stats?: {
     totalTickets: number;
     solvedTickets: number;
     avgFirstResponse: string;
@@ -14,7 +15,25 @@ interface ReportCardsProps {
   };
 }
 
-export default function ReportCards({ stats }: ReportCardsProps) {
+export default function ReportCards({ stats: propStats }: ReportCardsProps) {
+  const { stats: hookStats, isLoading } = useReportsData();
+
+  const stats = propStats || hookStats;
+
+  if (!stats) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="p-5 rounded-2xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] animate-pulse">
+            <div className="w-11 h-11 rounded-xl bg-[rgba(255,255,255,0.05)] mb-3" />
+            <div className="h-3 bg-[rgba(255,255,255,0.05)] rounded w-1/2 mb-2" />
+            <div className="h-8 bg-[rgba(255,255,255,0.05)] rounded w-3/4" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const cards = [
     { id: 1, title: "کل گفتگوها", value: stats.totalTickets, change: "+۱۲٪", trend: "up", icon: MessageCircle, color: "#59D8C3" },
     { id: 2, title: "گفتگوهای حل‌شده", value: stats.solvedTickets, change: "+۸٪", trend: "up", icon: CheckCircle, color: "#5BE0A8" },

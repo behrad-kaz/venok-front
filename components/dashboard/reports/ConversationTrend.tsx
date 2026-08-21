@@ -1,16 +1,61 @@
 // components/dashboard/reports/ConversationTrend.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import { useState } from "react";
-import { trendData } from "./data";
-import { TrendData } from "./types";
+import { motion } from "framer-motion";
+import { useReportsData } from "./hooks/useReportsData";
 
-const maxValue = Math.max(...trendData.map(d => Math.max(d.new, d.open, d.closed)), 1);
+interface ConversationTrendProps {
+  data?: {
+    day: string;
+    new: number;
+    open: number;
+    closed: number;
+  }[];
+}
 
-export default function ConversationTrend() {
+export default function ConversationTrend({ data: propData }: ConversationTrendProps) {
+  const { trendData: hookData, isLoading } = useReportsData();
   const [hoveredBar, setHoveredBar] = useState<{ day: string; type: string; value: number } | null>(null);
 
+  const data = propData || hookData;
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <h3 className="text-sm font-bold text-white mb-4">روند گفتگوها</h3>
+        <div className="h-48 flex items-end justify-between gap-2">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-2">
+              <div className="w-full flex items-end justify-center gap-1 h-32">
+                {[1, 2, 3].map((j) => (
+                  <div
+                    key={j}
+                    className="w-full rounded-t-lg bg-[rgba(255,255,255,0.03)] animate-pulse"
+                    style={{ height: `${Math.max(20, Math.random() * 80)}%` }}
+                  />
+                ))}
+              </div>
+              <div className="h-3 w-6 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <h3 className="text-sm font-bold text-white mb-4">روند گفتگوها</h3>
+        <div className="h-48 flex items-center justify-center">
+          <p className="text-xs text-gray-500">داده‌ای برای نمایش وجود ندارد</p>
+        </div>
+      </div>
+    );
+  }
+
+  const maxValue = Math.max(...data.map(d => Math.max(d.new, d.open, d.closed)), 1);
   const getBarHeight = (value: number) => (value / maxValue) * 100;
 
   return (
@@ -19,46 +64,42 @@ export default function ConversationTrend() {
 
       <div className="relative">
         <div className="h-48 flex items-end justify-between gap-2">
-          {trendData.map((data: TrendData, idx: number) => (
-            <div key={data.day} className="flex-1 flex flex-col items-center gap-2">
+          {data.map((item, idx) => (
+            <div key={item.day} className="flex-1 flex flex-col items-center gap-2">
               <div className="w-full flex items-end justify-center gap-1 h-32">
-                {/* نوار گفتگوهای جدید */}
                 <motion.div
                   initial={{ height: 0 }}
-                  animate={{ height: `${getBarHeight(data.new)}%` }}
+                  animate={{ height: `${getBarHeight(item.new)}%` }}
                   transition={{ duration: 0.5, delay: idx * 0.05 }}
-                  onMouseEnter={() => setHoveredBar({ day: data.day, type: "جدید", value: data.new })}
+                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "جدید", value: item.new })}
                   onMouseLeave={() => setHoveredBar(null)}
                   className="w-full rounded-t-lg bg-[rgba(89,216,195,0.3)] border-t-2 border-[#59D8C3] transition-all hover:bg-[rgba(89,216,195,0.4)] cursor-pointer"
-                  style={{ height: `${getBarHeight(data.new)}%` }}
+                  style={{ height: `${getBarHeight(item.new)}%` }}
                 />
-                {/* نوار گفتگوهای باز */}
                 <motion.div
                   initial={{ height: 0 }}
-                  animate={{ height: `${getBarHeight(data.open)}%` }}
+                  animate={{ height: `${getBarHeight(item.open)}%` }}
                   transition={{ duration: 0.5, delay: idx * 0.05 }}
-                  onMouseEnter={() => setHoveredBar({ day: data.day, type: "باز", value: data.open })}
+                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "باز", value: item.open })}
                   onMouseLeave={() => setHoveredBar(null)}
                   className="w-full rounded-t-lg bg-[rgba(242,184,75,0.3)] border-t-2 border-[#F2B84B] transition-all hover:bg-[rgba(242,184,75,0.4)] cursor-pointer"
-                  style={{ height: `${getBarHeight(data.open)}%` }}
+                  style={{ height: `${getBarHeight(item.open)}%` }}
                 />
-                {/* نوار گفتگوهای بسته */}
                 <motion.div
                   initial={{ height: 0 }}
-                  animate={{ height: `${getBarHeight(data.closed)}%` }}
+                  animate={{ height: `${getBarHeight(item.closed)}%` }}
                   transition={{ duration: 0.5, delay: idx * 0.05 }}
-                  onMouseEnter={() => setHoveredBar({ day: data.day, type: "بسته", value: data.closed })}
+                  onMouseEnter={() => setHoveredBar({ day: item.day, type: "بسته", value: item.closed })}
                   onMouseLeave={() => setHoveredBar(null)}
                   className="w-full rounded-t-lg bg-[rgba(91,224,168,0.3)] border-t-2 border-[#5BE0A8] transition-all hover:bg-[rgba(91,224,168,0.4)] cursor-pointer"
-                  style={{ height: `${getBarHeight(data.closed)}%` }}
+                  style={{ height: `${getBarHeight(item.closed)}%` }}
                 />
               </div>
-              <span className="text-[10px] text-gray-500">{data.day}</span>
+              <span className="text-[10px] text-gray-500">{item.day}</span>
             </div>
           ))}
         </div>
 
-        {/* Tooltip */}
         {hoveredBar && (
           <div
             className="absolute bg-[#0D1B17] border border-[#59D8C3]/30 rounded-lg px-3 py-1.5 shadow-lg z-50 text-center"
@@ -76,7 +117,6 @@ export default function ConversationTrend() {
         )}
       </div>
 
-      {/* راهنما */}
       <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-[rgba(255,255,255,0.1)]">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded bg-[#59D8C3]" />

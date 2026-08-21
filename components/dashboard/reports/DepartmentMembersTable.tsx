@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useReportsData } from "./hooks/useReportsData";
 
 export interface DepartmentMember {
   id: number;
@@ -14,10 +15,26 @@ export interface DepartmentMember {
 }
 
 interface DepartmentMembersTableProps {
-  members: DepartmentMember[];
+  members?: DepartmentMember[];
 }
 
-export default function DepartmentMembersTable({ members }: DepartmentMembersTableProps) {
+export default function DepartmentMembersTable({ members: propMembers }: DepartmentMembersTableProps) {
+  const { members: hookMembers, isLoading } = useReportsData();
+  const members = propMembers || hookMembers;
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <div className="h-6 bg-[rgba(255,255,255,0.05)] rounded w-48 mb-5 animate-pulse" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
       <div className="flex items-center justify-between mb-5">

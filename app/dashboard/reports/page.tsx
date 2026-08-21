@@ -16,13 +16,7 @@ import MembersTable from "@/components/dashboard/reports/MembersTable";
 import TopTopics from "@/components/dashboard/reports/TopTopics";
 import PeakHoursChart from "@/components/dashboard/reports/PeakHoursChart";
 import Suggestions from "@/components/dashboard/reports/Suggestions";
-import {
-  departmentsData,
-  membersData,
-  statsData,
-  topTopics,
-  suggestions,
-} from "@/components/dashboard/reports/data";
+import { useReportsData } from "@/components/dashboard/reports/hooks/useReportsData";
 
 // مودال‌های گزارشات مدیر کل
 import PerformanceReportModal from "@/components/dashboard/reports/modals/PerformanceReportModal";
@@ -46,105 +40,6 @@ import DepartmentSatisfactionReportModal from "@/components/dashboard/reports/mo
 import DepartmentConversationsReportModal from "@/components/dashboard/reports/modals/DepartmentConversationsReportModal";
 import DepartmentResponseTimeReportModal from "@/components/dashboard/reports/modals/DepartmentResponseTimeReportModal";
 
-// داده‌های دمو برای مدیر دپارتمان
-const departmentStatsData = {
-  totalTickets: 127,
-  openTickets: 12,
-  solvedTickets: 115,
-  avgFirstResponse: "۴ دقیقه",
-  resolutionRate: 91,
-};
-
-// داده‌های اعضا برای مدیر دپارتمان
-const departmentMembersData = [
-  {
-    id: 1,
-    name: "سارا احمدی",
-    initials: "سا",
-    answeredTickets: 48,
-    avgResponseTime: "۳ دقیقه",
-    openTickets: 5,
-    lastActivity: "۲ دقیقه پیش",
-    status: "active" as const,
-  },
-  {
-    id: 2,
-    name: "نیلوفر محمدی",
-    initials: "نم",
-    answeredTickets: 42,
-    avgResponseTime: "۵ دقیقه",
-    openTickets: 4,
-    lastActivity: "۱ دقیقه پیش",
-    status: "active" as const,
-  },
-  {
-    id: 3,
-    name: "رضا کریمی",
-    initials: "رک",
-    answeredTickets: 35,
-    avgResponseTime: "۶ دقیقه",
-    openTickets: 2,
-    lastActivity: "۱۵ دقیقه پیش",
-    status: "active" as const,
-  },
-];
-
-const departmentTopicsData = [
-  { id: 1, title: "مشکل پرداخت", count: 78, percentage: 27, trend: "up" as const },
-  { id: 2, title: "پیگیری سفارش", count: 65, percentage: 23, trend: "stable" as const },
-  { id: 3, title: "سوال قبل از خرید", count: 54, percentage: 19, trend: "down" as const },
-  { id: 4, title: "سایر موارد", count: 87, percentage: 31, trend: "stable" as const },
-];
-
-const departmentSuggestionsData = [
-  {
-    id: 1,
-    title: "چند گفتگو بیشتر از ۱۰ دقیقه در انتظار پاسخ مانده‌اند.",
-    type: "warning" as const,
-    link: "/dashboard/conversations",
-    linkText: "مشاهده گفتگوها",
-  },
-  {
-    id: 2,
-    title: "یکی از اعضا تعداد زیادی گفتگوی باز دارد.",
-    type: "info" as const,
-    link: "/dashboard/members",
-    linkText: "بررسی اعضای دپارتمان",
-  },
-  {
-    id: 3,
-    title: "حجم گفتگوهای امروز نسبت به میانگین هفته ۲۰٪ بیشتر است.",
-    type: "info" as const,
-    link: "/dashboard/conversations",
-    linkText: "مشاهده گفتگوها",
-  },
-];
-
-const departmentTrendData = [
-  { day: "شنبه", new: 42, open: 30, closed: 12 },
-  { day: "یکشنبه", new: 38, open: 28, closed: 10 },
-  { day: "دوشنبه", new: 45, open: 32, closed: 13 },
-  { day: "سه‌شنبه", new: 40, open: 29, closed: 11 },
-  { day: "چهارشنبه", new: 48, open: 35, closed: 13 },
-  { day: "پنجشنبه", new: 38, open: 27, closed: 11 },
-  { day: "جمعه", new: 33, open: 24, closed: 9 },
-];
-
-const departmentStatusDistribution = {
-  open: { label: "باز", count: 28, percentage: 10, color: "#59D8C3" },
-  waiting: { label: "در انتظار پاسخ", count: 35, percentage: 12, color: "#F2B84B" },
-  answered: { label: "پاسخ داده شده", count: 156, percentage: 55, color: "#8B7FDF" },
-  closed: { label: "بسته شده", count: 65, percentage: 23, color: "#9CA3AF" },
-};
-
-// کارت‌های گزارش برای مدیر کل
-const reportCards = [
-  { id: "performance", title: "گزارش عملکرد", icon: Activity, color: "#59D8C3" },
-  { id: "satisfaction", title: "گزارش رضایت", icon: Smile, color: "#59D8C3" },
-  { id: "conversations", title: "گزارش گفتگوها", icon: MessageCircle, color: "#59D8C3" },
-  { id: "responseTime", title: "گزارش زمان پاسخ", icon: Clock, color: "#59D8C3" },
-];
-
 export default function ReportsPage() {
   const { role } = useRoleStore();
   const [dateRange, setDateRange] = useState("week");
@@ -155,7 +50,16 @@ export default function ReportsPage() {
     console.log("خروجی گرفتن از گزارشات");
   };
 
-  // کارت‌های گزارش برای مدیر دپارتمان
+  const adminReports = useReportsData();
+  const departmentReports = useReportsData();
+
+  const reportCards = [
+    { id: "performance", title: "گزارش عملکرد", icon: Activity, color: "#59D8C3" },
+    { id: "satisfaction", title: "گزارش رضایت", icon: Smile, color: "#59D8C3" },
+    { id: "conversations", title: "گزارش گفتگوها", icon: MessageCircle, color: "#59D8C3" },
+    { id: "responseTime", title: "گزارش زمان پاسخ", icon: Clock, color: "#59D8C3" },
+  ];
+
   const departmentReportCards = [
     { id: "performance", title: "گزارش عملکرد", icon: "TrendingUp", color: "#59D8C3" },
     { id: "satisfaction", title: "گزارش رضایت", icon: "Smile", color: "#59D8C3" },
@@ -163,17 +67,13 @@ export default function ReportsPage() {
     { id: "responseTime", title: "گزارش زمان پاسخ", icon: "Clock", color: "#59D8C3" },
   ];
 
-  // اگر نقش مدیر دپارتمان است، صفحه اختصاصی را نمایش بده
   if (role === "مدیر") {
     return (
       <RoleGuard allowedRoles={["مدیر"]}>
         <DashboardLayout>
           <div className="space-y-6">
             {/* کارت‌های گزارش */}
-            <DepartmentReportCards
-              cards={departmentReportCards}
-              onCardClick={setOpenModal}
-            />
+            <DepartmentReportCards cards={departmentReportCards} onCardClick={setOpenModal} />
 
             {/* فیلترها */}
             <DepartmentDateRangeFilter
@@ -185,54 +85,65 @@ export default function ReportsPage() {
             />
 
             {/* کارت‌های آمار */}
-            <DepartmentReportCards stats={departmentStatsData} />
+            <DepartmentReportCards
+              stats={
+                departmentReports.stats
+                  ? {
+                      totalTickets: departmentReports.stats.totalTickets,
+                      openTickets: departmentReports.stats.totalTickets - departmentReports.stats.solvedTickets,
+                      solvedTickets: departmentReports.stats.solvedTickets,
+                      avgFirstResponse: departmentReports.stats.avgFirstResponse,
+                      resolutionRate: departmentReports.stats.resolutionRate,
+                    }
+                  : undefined
+              }
+            />
 
             {/* نمودارها */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <DepartmentConversationTrend data={departmentTrendData} />
-              <DepartmentStatusDistribution data={departmentStatusDistribution} />
+              <DepartmentConversationTrend data={departmentReports.trendData} />
+              <DepartmentStatusDistribution data={departmentReports.statusDistribution} />
             </div>
 
             {/* عملکرد اعضا */}
-            <DepartmentMembersTable members={departmentMembersData} />
+            <DepartmentMembersTable members={departmentReports.members} />
 
             {/* موضوعات پرتکرار و وضعیت پاسخگویی */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <DepartmentTopTopics topics={departmentTopicsData} />
+              <DepartmentTopTopics topics={departmentReports.topTopics} />
               <DepartmentResponseStatus />
             </div>
 
             {/* پیشنهادهای مدیریتی */}
-            <DepartmentSuggestions suggestions={departmentSuggestionsData} />
-          </div>
+            <DepartmentSuggestions suggestions={departmentReports.suggestions} />
 
-          {/* مودال‌های گزارشات مدیر دپارتمان */}
-          <DepartmentPerformanceReportModal
-            isOpen={openModal === "performance"}
-            onClose={() => setOpenModal(null)}
-            departmentName="پشتیبانی"
-          />
-          <DepartmentSatisfactionReportModal
-            isOpen={openModal === "satisfaction"}
-            onClose={() => setOpenModal(null)}
-            departmentName="پشتیبانی"
-          />
-          <DepartmentConversationsReportModal
-            isOpen={openModal === "conversations"}
-            onClose={() => setOpenModal(null)}
-            departmentName="پشتیبانی"
-          />
-          <DepartmentResponseTimeReportModal
-            isOpen={openModal === "responseTime"}
-            onClose={() => setOpenModal(null)}
-            departmentName="پشتیبانی"
-          />
+            {/* مودال‌های گزارشات مدیر دپارتمان */}
+            <DepartmentPerformanceReportModal
+              isOpen={openModal === "performance"}
+              onClose={() => setOpenModal(null)}
+              departmentName="پشتیبانی"
+            />
+            <DepartmentSatisfactionReportModal
+              isOpen={openModal === "satisfaction"}
+              onClose={() => setOpenModal(null)}
+              departmentName="پشتیبانی"
+            />
+            <DepartmentConversationsReportModal
+              isOpen={openModal === "conversations"}
+              onClose={() => setOpenModal(null)}
+              departmentName="پشتیبانی"
+            />
+            <DepartmentResponseTimeReportModal
+              isOpen={openModal === "responseTime"}
+              onClose={() => setOpenModal(null)}
+              departmentName="پشتیبانی"
+            />
+          </div>
         </DashboardLayout>
       </RoleGuard>
     );
   }
 
-  // برای مدیر کل، صفحه اصلی گزارشات را نمایش بده
   if (role === "مدیر کل") {
     return (
       <RoleGuard allowedRoles={["مدیر کل"]}>
@@ -271,53 +182,64 @@ export default function ReportsPage() {
             />
 
             {/* کارت‌های آمار */}
-            <ReportCards stats={statsData} />
+            <ReportCards
+              stats={
+                adminReports.stats
+                  ? {
+                      totalTickets: adminReports.stats.totalTickets,
+                      solvedTickets: adminReports.stats.solvedTickets,
+                      avgFirstResponse: adminReports.stats.avgFirstResponse,
+                      avgResolutionTime: adminReports.stats.avgResolutionTime,
+                      resolutionRate: adminReports.stats.resolutionRate,
+                    }
+                  : undefined
+              }
+            />
 
             {/* نمودارها */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ConversationTrendChart />
-              <StatusDistributionChart />
+              <ConversationTrendChart data={adminReports.trendData} />
+              <StatusDistributionChart data={adminReports.statusDistribution} />
             </div>
 
             {/* عملکرد دپارتمان‌ها */}
-            <DepartmentsTable departments={departmentsData} />
+            <DepartmentsTable departments={adminReports.departments} />
 
             {/* عملکرد اعضا */}
-            <MembersTable members={membersData} />
+            <MembersTable members={adminReports.members} />
 
             {/* موضوعات پرتکرار و ساعات پرترافیک */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <TopTopics topics={topTopics} />
-              <PeakHoursChart />
+              <TopTopics topics={adminReports.topTopics} />
+              <PeakHoursChart data={adminReports.peakHours} />
             </div>
 
             {/* پیشنهادهای عملیاتی */}
-            <Suggestions suggestions={suggestions} />
-          </div>
+            <Suggestions suggestions={adminReports.suggestions} />
 
-          {/* مودال‌های گزارشات مدیر کل */}
-          <PerformanceReportModal
-            isOpen={openModal === "performance"}
-            onClose={() => setOpenModal(null)}
-          />
-          <SatisfactionReportModal
-            isOpen={openModal === "satisfaction"}
-            onClose={() => setOpenModal(null)}
-          />
-          <ConversationsReportModal
-            isOpen={openModal === "conversations"}
-            onClose={() => setOpenModal(null)}
-          />
-          <ResponseTimeReportModal
-            isOpen={openModal === "responseTime"}
-            onClose={() => setOpenModal(null)}
-          />
+            {/* مودال‌های گزارشات مدیر کل */}
+            <PerformanceReportModal
+              isOpen={openModal === "performance"}
+              onClose={() => setOpenModal(null)}
+            />
+            <SatisfactionReportModal
+              isOpen={openModal === "satisfaction"}
+              onClose={() => setOpenModal(null)}
+            />
+            <ConversationsReportModal
+              isOpen={openModal === "conversations"}
+              onClose={() => setOpenModal(null)}
+            />
+            <ResponseTimeReportModal
+              isOpen={openModal === "responseTime"}
+              onClose={() => setOpenModal(null)}
+            />
+          </div>
         </DashboardLayout>
       </RoleGuard>
     );
   }
 
-  // برای کارمند
   return (
     <RoleGuard allowedRoles={["کارمند"]}>
       <DashboardLayout>

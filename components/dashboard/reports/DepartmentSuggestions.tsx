@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AlertTriangle, Info } from "lucide-react";
+import { useReportsData } from "./hooks/useReportsData";
 
 interface Suggestion {
   id: number;
@@ -12,7 +13,7 @@ interface Suggestion {
 }
 
 interface DepartmentSuggestionsProps {
-  suggestions: Suggestion[];
+  suggestions?: Suggestion[];
 }
 
 const getIcon = (type: string) => {
@@ -32,7 +33,23 @@ const getIcon = (type: string) => {
   };
 };
 
-export default function DepartmentSuggestions({ suggestions }: DepartmentSuggestionsProps) {
+export default function DepartmentSuggestions({ suggestions: propSuggestions }: DepartmentSuggestionsProps) {
+  const { suggestions: hookSuggestions, isLoading } = useReportsData();
+  const suggestions = propSuggestions || hookSuggestions;
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <div className="h-6 bg-[rgba(255,255,255,0.05)] rounded w-48 mb-5 animate-pulse" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
       <div className="flex items-center justify-between mb-5">

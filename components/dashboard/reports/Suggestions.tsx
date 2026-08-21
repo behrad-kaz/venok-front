@@ -3,14 +3,31 @@
 
 import Link from "next/link";
 import { Info, AlertTriangle } from "lucide-react";
+import { useReportsData } from "./hooks/useReportsData";
 
 interface SuggestionsProps {
-  suggestions: { id: number; title: string; type: string; link: string; linkText: string }[];
+  suggestions?: { id: number; title: string; type: string; link: string; linkText: string }[];
 }
 
-export default function Suggestions({ suggestions }: SuggestionsProps) {
+export default function Suggestions({ suggestions: propSuggestions }: SuggestionsProps) {
+  const { suggestions: hookSuggestions, isLoading } = useReportsData();
+  const suggestions = propSuggestions || hookSuggestions;
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <div className="h-6 bg-[rgba(255,255,255,0.05)] rounded w-48 mb-5 animate-pulse" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-5 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
+    <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-base font-bold text-white">پیشنهادهای عملیاتی</h3>
       </div>

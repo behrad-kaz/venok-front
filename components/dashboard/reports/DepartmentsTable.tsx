@@ -2,11 +2,8 @@
 "use client";
 
 import Link from "next/link";
+import { useReportsData } from "./hooks/useReportsData";
 import { DepartmentPerformance } from "./types";
-
-interface DepartmentsTableProps {
-  departments: DepartmentPerformance[];
-}
 
 const getStatusBadge = (status: DepartmentPerformance["status"]) => {
   switch (status) {
@@ -19,7 +16,27 @@ const getStatusBadge = (status: DepartmentPerformance["status"]) => {
   }
 };
 
-export default function DepartmentsTable({ departments }: DepartmentsTableProps) {
+interface DepartmentsTableProps {
+  departments?: DepartmentPerformance[];
+}
+
+export default function DepartmentsTable({ departments: propDepartments }: DepartmentsTableProps) {
+  const { departments: hookDepartments, isLoading } = useReportsData();
+  const departments = propDepartments || hookDepartments;
+
+  if (isLoading) {
+    return (
+      <div className="p-5 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
+        <div className="h-6 bg-[rgba(255,255,255,0.05)] rounded w-48 mb-5 animate-pulse" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-5 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
       <div className="flex items-center justify-between mb-5">

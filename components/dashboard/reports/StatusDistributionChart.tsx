@@ -1,37 +1,67 @@
 // components/dashboard/reports/StatusDistributionChart.tsx
 "use client";
 
-import { statusDistribution } from "./data";
+import { useReportsData } from "./hooks/useReportsData";
 
-export default function StatusDistributionChart() {
+interface StatusDistributionChartProps {
+  data?: {
+    open: { label: string; count: number; percentage: number; color: string };
+    waiting: { label: string; count: number; percentage: number; color: string };
+    answered: { label: string; count: number; percentage: number; color: string };
+    closed: { label: string; count: number; percentage: number; color: string };
+  } | null;
+}
+
+export default function StatusDistributionChart({ data: propData }: StatusDistributionChartProps) {
+  const { statusDistribution: hookData, isLoading } = useReportsData();
+  const data = propData || hookData;
+
+  if (isLoading || !data) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <div className="h-6 bg-[rgba(255,255,255,0.05)] rounded w-48 mb-5 animate-pulse" />
+        <div className="space-y-3">
+          <div className="h-12 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-12 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const items = Object.values(data);
+
   return (
-    <div className="p-5 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
+    <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
       <div className="flex items-center justify-between mb-5">
-        <h3 className="text-base font-bold text-white">توزیع وضعیت گفتگوها</h3>
+        <h3 className="text-sm font-bold text-white">توزیع وضعیت گفتگوها</h3>
       </div>
       <div className="space-y-4">
         <div className="w-full h-12 rounded-3xl overflow-hidden flex">
-          {Object.entries(statusDistribution).map(([key, data]) => (
+          {items.map((item) => (
             <div
-              key={key}
+              key={item.label}
               className="flex items-center justify-center text-xs font-bold text-white transition-all hover:opacity-80"
-              style={{ width: `${data.percentage}%`, backgroundColor: data.color }}
-              title={`${data.label}: ${data.count}`}
+              style={{ width: `${item.percentage}%`, backgroundColor: item.color }}
+              title={`${item.label}: ${item.count}`}
             >
-               {data.percentage}%
+               {item.percentage}%
             </div>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {Object.entries(statusDistribution).map(([key, data]) => (
-            <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
+          {items.map((item) => (
+            <div key={item.label} className="flex items-center justify-between p-3 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: data.color }} />
-                <span className="text-xs text-gray-500">{data.label}</span>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="text-xs text-gray-500">{item.label}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">{data.count}</span>
-                <span className="text-xs text-gray-500">({data.percentage}%)</span>
+                <span className="text-sm font-bold text-white">{item.count}</span>
+                <span className="text-xs text-gray-500">({item.percentage}%)</span>
               </div>
             </div>
           ))}

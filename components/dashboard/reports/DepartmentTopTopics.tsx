@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useReportsData } from "./hooks/useReportsData";
 
 interface Topic {
   id: number;
@@ -11,7 +12,7 @@ interface Topic {
 }
 
 interface DepartmentTopTopicsProps {
-  topics: Topic[];
+  topics?: Topic[];
 }
 
 const getTrendIcon = (trend: string) => {
@@ -20,7 +21,23 @@ const getTrendIcon = (trend: string) => {
   return <Minus className="w-4 h-4 text-gray-500" />;
 };
 
-export default function DepartmentTopTopics({ topics }: DepartmentTopTopicsProps) {
+export default function DepartmentTopTopics({ topics: propTopics }: DepartmentTopTopicsProps) {
+  const { topTopics: hookTopics, isLoading } = useReportsData();
+  const topics = propTopics || hookTopics;
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <div className="h-6 bg-[rgba(255,255,255,0.05)] rounded w-48 mb-5 animate-pulse" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
       <div className="flex items-center justify-between mb-5">

@@ -2,9 +2,10 @@
 "use client";
 
 import { ChevronRight, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { useReportsData } from "./hooks/useReportsData";
 
 interface TopTopicsProps {
-  topics: { id: number; title: string; count: number; percentage: number; trend: string }[];
+  topics?: { id: number; title: string; count: number; percentage: number; trend: string }[];
 }
 
 const getTrendIcon = (trend: string) => {
@@ -13,9 +14,25 @@ const getTrendIcon = (trend: string) => {
   return <Minus className="w-4 h-4 text-gray-500" />;
 };
 
-export default function TopTopics({ topics }: TopTopicsProps) {
+export default function TopTopics({ topics: propTopics }: TopTopicsProps) {
+  const { topTopics: hookTopics, isLoading } = useReportsData();
+  const topics = propTopics || hookTopics;
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
+        <div className="h-6 bg-[rgba(255,255,255,0.05)] rounded w-48 mb-5 animate-pulse" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 bg-[rgba(255,255,255,0.03)] rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-5 rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)]">
+    <div className="rounded-2xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.1)] p-5">
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-base font-bold text-white">موضوعات پرتکرار</h3>
       </div>

@@ -12,13 +12,13 @@ interface DepartmentPerformanceReportModalProps {
 }
 
 const departmentTrendData = [
-  { day: "شنبه", new: 42, solved: 38 },
-  { day: "یکشنبه", new: 38, solved: 35 },
-  { day: "دوشنبه", new: 45, solved: 42 },
-  { day: "سه‌شنبه", new: 40, solved: 38 },
-  { day: "چهارشنبه", new: 48, solved: 45 },
-  { day: "پنجشنبه", new: 38, solved: 32 },
-  { day: "جمعه", new: 33, solved: 26 },
+  { day: "شنبه", new: 42, open: 30, closed: 12 },
+  { day: "یکشنبه", new: 38, open: 28, closed: 10 },
+  { day: "دوشنبه", new: 45, open: 32, closed: 13 },
+  { day: "سه‌شنبه", new: 40, open: 29, closed: 11 },
+  { day: "چهارشنبه", new: 48, open: 35, closed: 13 },
+  { day: "پنجشنبه", new: 38, open: 27, closed: 11 },
+  { day: "جمعه", new: 33, open: 24, closed: 9 },
 ];
 
 const topMembers = [
