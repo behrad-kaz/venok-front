@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "@/services/api-client";
 import { authService } from "@/services/auth.service";
 import { fetchTeams } from "@/services/membersApi";
+import * as XLSX from "xlsx";
 
 export interface ReportStats {
   totalTickets: number;
@@ -83,6 +84,7 @@ interface UseReportsDataReturn {
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+  exportToExcel: () => void;
 }
 
 const getDayName = (date: Date): string => {
@@ -138,7 +140,52 @@ const calculateAvgResponseTime = (conversations: any[]): string => {
   return `${avgMinutes} دقیقه`;
 };
 
-export function useReportsData(departmentId?: number): UseReportsDataReturn {
+const filterConversationsByDateRange = (conversations: any[], dateRange: string): any[] => {
+  const now = new Date();
+  now.setHours(23, 59, 59, 999);
+
+  let startDate: Date;
+
+  switch (dateRange) {
+    case "today":
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case "week":
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case "month":
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 29);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case "custom":
+    default:
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+  }
+
+  return conversations.filter((conv: any) => {
+    if (!conv.createdAt) return false;
+    const createdDate = new Date(conv.createdAt);
+    return createdDate >= startDate && createdDate <= now;
+  });
+};
+
+const filterConversationsByStatus = (conversations: any[], status: string): any[] => {
+  if (status === "all") return conversations;
+  return conversations.filter((conv: any) => conv.status === status);
+};
+
+export function useReportsData(
+  departmentId?: number,
+  dateRange: string = "week",
+  selectedStatus: string = "all"
+): UseReportsDataReturn {
   const [stats, setStats] = useState<ReportStats | null>(null);
   const [departments, setDepartments] = useState<ReportDepartmentPerformance[]>([]);
   const [members, setMembers] = useState<ReportMemberPerformance[]>([]);
@@ -149,6 +196,9 @@ export function useReportsData(departmentId?: number): UseReportsDataReturn {
   const [suggestions, setSuggestions] = useState<ReportSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [allConversations, setAllConversations] = useState<any[]>([]);
+  const [allStaff, setAllStaff] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
 
   const fetchReportsData = useCallback(async () => {
     try {
@@ -169,23 +219,30 @@ export function useReportsData(departmentId?: number): UseReportsDataReturn {
         fetchTeams(),
       ]);
 
-      const allConversations = conversationsResponse?.data || [];
-      const allStaff = staffResponseAll?.data || [];
-      const teams = teamsResponse || [];
+      const conversations = conversationsResponse?.data || [];
+      const staff = staffResponseAll?.data || [];
+      const teamsData = teamsResponse || [];
 
-      let filteredConversations = allConversations;
-      let filteredStaff = allStaff;
+      setAllConversations(conversations);
+      setAllStaff(staff);
+      setTeams(teamsData);
+
+      let filteredConversations = conversations;
+      let filteredStaff = staff;
 
       if (targetDepartmentId) {
-        filteredConversations = allConversations.filter(
+        filteredConversations = conversations.filter(
           (conv: any) => conv.teamId === targetDepartmentId && conv.deletedAt === null
         );
-        filteredStaff = allStaff.filter(
-          (staff: any) => staff.departmentId === targetDepartmentId && staff.deletedAt === null
+        filteredStaff = staff.filter(
+          (s: any) => s.departmentId === targetDepartmentId && s.deletedAt === null
         );
       } else {
-        filteredConversations = allConversations.filter((conv: any) => conv.deletedAt === null);
+        filteredConversations = conversations.filter((conv: any) => conv.deletedAt === null);
       }
+
+      filteredConversations = filterConversationsByDateRange(filteredConversations, dateRange);
+      filteredConversations = filterConversationsByStatus(filteredConversations, selectedStatus);
 
       const totalTickets = filteredConversations.length;
       const solvedTickets = filteredConversations.filter((conv: any) => conv.status === "closed").length;
@@ -201,8 +258,8 @@ export function useReportsData(departmentId?: number): UseReportsDataReturn {
       });
 
       if (!targetDepartmentId) {
-        const departmentStats: ReportDepartmentPerformance[] = teams.map((team: any) => {
-          const deptConvs = allConversations.filter(
+        const departmentStats: ReportDepartmentPerformance[] = teamsData.map((team: any) => {
+          const deptConvs = conversations.filter(
             (conv: any) => conv.teamId === team.id && conv.deletedAt === null
           );
           const deptTotal = deptConvs.length;
@@ -228,9 +285,9 @@ export function useReportsData(departmentId?: number): UseReportsDataReturn {
         setDepartments(departmentStats);
       }
 
-      const memberPerformance: ReportMemberPerformance[] = filteredStaff.map((staff: any) => {
+      const memberPerformance: ReportMemberPerformance[] = filteredStaff.map((s: any) => {
         const staffConvs = filteredConversations.filter(
-          (conv: any) => conv.agentId === staff.id || conv.agent?.id === staff.id
+          (conv: any) => conv.agentId === s.id || conv.agent?.id === s.id
         );
         const answered = staffConvs.filter(
           (conv: any) => conv.status === "answered" || conv.status === "closed"
@@ -240,22 +297,22 @@ export function useReportsData(departmentId?: number): UseReportsDataReturn {
         ).length;
         const avgResponse = calculateAvgResponseTime(staffConvs);
 
-        const name = staff.name || "نامشخص";
+        const name = s.name || "نامشخص";
         const nameParts = name.split(" ");
         const initials = nameParts.length >= 2 ? `${nameParts[0][0]}${nameParts[1][0]}` : name.substring(0, 2);
 
-        const deptName = staff.department?.name || teams.find((t: any) => t.id === staff.departmentId)?.name || "بدون دپارتمان";
+        const deptName = s.department?.name || teamsData.find((t: any) => t.id === s.departmentId)?.name || "بدون دپارتمان";
 
         return {
-          id: staff.id,
+          id: s.id,
           name,
           initials,
           department: deptName,
           answeredTickets: answered,
           avgResponseTime: avgResponse,
           openTickets: open,
-          lastActivity: staff.lastOnlineAt ? "آنلاین" : "آفلاین",
-          status: staff.isActive !== false ? "active" : "inactive",
+          lastActivity: s.lastOnlineAt ? "آنلاین" : "آفلاین",
+          status: s.isActive !== false ? "active" : "inactive",
         };
       });
 
@@ -400,7 +457,92 @@ export function useReportsData(departmentId?: number): UseReportsDataReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [departmentId]);
+  }, [departmentId, dateRange, selectedStatus]);
+
+  const exportToExcel = useCallback(() => {
+    if (!allConversations.length && !allStaff.length && !teams.length) {
+      alert("داده‌ای برای خروجی گرفتن وجود ندارد.");
+      return;
+    }
+
+    const wsData: any[][] = [];
+
+    wsData.push(["گزارش ورک‌اسپس"]);
+    wsData.push(["تاریخ تولید:", new Date().toLocaleDateString("fa-IR")]);
+    wsData.push(["بازه زمانی:", dateRange === "today" ? "امروز" : dateRange === "week" ? "۷ روز اخیر" : dateRange === "month" ? "۳۰ روز اخیر" : "بازه دلخواه"]);
+    wsData.push(["وضعیت:", selectedStatus === "all" ? "همه وضعیت‌ها" : selectedStatus]);
+    wsData.push([]);
+
+    if (stats) {
+      wsData.push(["آمار کلی"]);
+      wsData.push(["کل گفتگوها", stats.totalTickets]);
+      wsData.push(["گفتگوهای حل‌شده", stats.solvedTickets]);
+      wsData.push(["میانگین زمان اولین پاسخ", stats.avgFirstResponse]);
+      wsData.push(["نرخ حل‌شدن", `${stats.resolutionRate}٪`]);
+      wsData.push([]);
+    }
+
+    if (departments.length > 0) {
+      wsData.push(["عملکرد دپارتمان‌ها"]);
+      wsData.push(["دپارتمان", "کل گفتگوها", "گفتگوهای باز", "میانگین اولین پاسخ", "نرخ حل‌شدن", "وضعیت"]);
+      departments.forEach((dept) => {
+        wsData.push([dept.name, dept.totalTickets, dept.openTickets, dept.avgFirstResponse, `${dept.resolutionRate}٪`, dept.status]);
+      });
+      wsData.push([]);
+    }
+
+    if (members.length > 0) {
+      wsData.push(["عملکرد اعضا"]);
+      wsData.push(["عضو", "دپارتمان", "گفتگوهای پاسخ‌داده‌شده", "میانگین زمان پاسخ", "گفتگوهای باز", "آخرین فعالیت", "وضعیت"]);
+      members.forEach((member) => {
+        wsData.push([member.name, member.department, member.answeredTickets, member.avgResponseTime, member.openTickets, member.lastActivity, member.status === "active" ? "فعال" : "غیرفعال"]);
+      });
+      wsData.push([]);
+    }
+
+    if (trendData.length > 0) {
+      wsData.push(["روند گفتگوهای ۷ روز اخیر"]);
+      wsData.push(["روز", "جدید", "باز", "بسته"]);
+      trendData.forEach((item) => {
+        wsData.push([item.day, item.new, item.open, item.closed]);
+      });
+      wsData.push([]);
+    }
+
+    if (statusDistribution) {
+      wsData.push(["توزیع وضعیت گفتگوها"]);
+      wsData.push(["وضعیت", "تعداد", "درصد"]);
+      wsData.push([statusDistribution.open.label, statusDistribution.open.count, `${statusDistribution.open.percentage}%`]);
+      wsData.push([statusDistribution.waiting.label, statusDistribution.waiting.count, `${statusDistribution.waiting.percentage}%`]);
+      wsData.push([statusDistribution.answered.label, statusDistribution.answered.count, `${statusDistribution.answered.percentage}%`]);
+      wsData.push([statusDistribution.closed.label, statusDistribution.closed.count, `${statusDistribution.closed.percentage}%`]);
+      wsData.push([]);
+    }
+
+    if (topTopics.length > 0) {
+      wsData.push(["موضوعات پرتکرار"]);
+      wsData.push(["موضوع", "تعداد", "درصد"]);
+      topTopics.forEach((topic) => {
+        wsData.push([topic.title, topic.count, `${topic.percentage}%`]);
+      });
+      wsData.push([]);
+    }
+
+    if (peakHours.length > 0) {
+      wsData.push(["ساعات پرترافیک"]);
+      wsData.push(["ساعت", "تعداد گفتگو", "شدت"]);
+      peakHours.forEach((hour) => {
+        wsData.push([hour.hour, hour.value, hour.intensity]);
+      });
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "گزارشات");
+
+    const dateStr = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(wb, `reports-${dateStr}.xlsx`);
+  }, [allConversations, allStaff, teams, stats, departments, members, trendData, statusDistribution, topTopics, peakHours, dateRange, selectedStatus]);
 
   useEffect(() => {
     fetchReportsData();
@@ -418,5 +560,6 @@ export function useReportsData(departmentId?: number): UseReportsDataReturn {
     isLoading,
     error,
     refetch: fetchReportsData,
+    exportToExcel,
   };
 }

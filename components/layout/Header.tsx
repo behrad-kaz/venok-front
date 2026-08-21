@@ -273,6 +273,7 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
 
   const handleDashboard = () => router.push("/dashboard");
   const handleProfile = () => router.push("/dashboard/profile");
+  const handleSettings = () => router.push("/dashboard/settings");
 
   const pageTitle = getPageTitle(pathname);
   const isDashboardPage = pathname?.startsWith("/dashboard");
@@ -450,7 +451,7 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
                     <button onClick={handleProfile} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#12251F] hover:text-white transition-colors">
                       <UserCircle className="w-4 h-4" /><span>پروفایل من</span>
                     </button>
-                    <button onClick={handleProfile} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#12251F] hover:text-white transition-colors">
+                    <button onClick={handleSettings} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#12251F] hover:text-white transition-colors">
                       <Settings className="w-4 h-4" /><span>تنظیمات</span>
                     </button>
                     <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#FF6B6B] hover:bg-[#12251F] transition-colors">

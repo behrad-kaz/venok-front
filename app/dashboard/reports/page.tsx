@@ -50,8 +50,8 @@ export default function ReportsPage() {
     console.log("خروجی گرفتن از گزارشات");
   };
 
-  const adminReports = useReportsData();
-  const departmentReports = useReportsData();
+  const adminReports = useReportsData(undefined, dateRange, selectedStatus);
+  const departmentReports = useReportsData(undefined, dateRange, selectedStatus);
 
   const reportCards = [
     { id: "performance", title: "گزارش عملکرد", icon: Activity, color: "#59D8C3" },
@@ -72,19 +72,16 @@ export default function ReportsPage() {
       <RoleGuard allowedRoles={["مدیر"]}>
         <DashboardLayout>
           <div className="space-y-6">
-            {/* کارت‌های گزارش */}
             <DepartmentReportCards cards={departmentReportCards} onCardClick={setOpenModal} />
 
-            {/* فیلترها */}
             <DepartmentDateRangeFilter
               dateRange={dateRange}
               onDateRangeChange={setDateRange}
               selectedStatus={selectedStatus}
               onStatusChange={setSelectedStatus}
-              onExport={handleExport}
+              onExport={departmentReports.exportToExcel}
             />
 
-            {/* کارت‌های آمار */}
             <DepartmentReportCards
               stats={
                 departmentReports.stats
@@ -99,25 +96,20 @@ export default function ReportsPage() {
               }
             />
 
-            {/* نمودارها */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <DepartmentConversationTrend data={departmentReports.trendData} />
               <DepartmentStatusDistribution data={departmentReports.statusDistribution} />
             </div>
 
-            {/* عملکرد اعضا */}
             <DepartmentMembersTable members={departmentReports.members} />
 
-            {/* موضوعات پرتکرار و وضعیت پاسخگویی */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <DepartmentTopTopics topics={departmentReports.topTopics} />
               <DepartmentResponseStatus />
             </div>
 
-            {/* پیشنهادهای مدیریتی */}
             <DepartmentSuggestions suggestions={departmentReports.suggestions} />
 
-            {/* مودال‌های گزارشات مدیر دپارتمان */}
             <DepartmentPerformanceReportModal
               isOpen={openModal === "performance"}
               onClose={() => setOpenModal(null)}
@@ -149,7 +141,6 @@ export default function ReportsPage() {
       <RoleGuard allowedRoles={["مدیر کل"]}>
         <DashboardLayout>
           <div className="space-y-6">
-            {/* کارت‌های گزارش */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {reportCards.map((card) => (
                 <button
@@ -169,7 +160,6 @@ export default function ReportsPage() {
               ))}
             </div>
 
-            {/* فیلترها */}
             <DateRangeFilter
               dateRange={dateRange}
               onDateRangeChange={setDateRange}
@@ -177,11 +167,10 @@ export default function ReportsPage() {
               onDepartmentChange={() => {}}
               selectedStatus={selectedStatus}
               onStatusChange={setSelectedStatus}
-              onExport={handleExport}
+              onExport={adminReports.exportToExcel}
               departments={[]}
             />
 
-            {/* کارت‌های آمار */}
             <ReportCards
               stats={
                 adminReports.stats
@@ -196,28 +185,22 @@ export default function ReportsPage() {
               }
             />
 
-            {/* نمودارها */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <ConversationTrendChart data={adminReports.trendData} />
               <StatusDistributionChart data={adminReports.statusDistribution} />
             </div>
 
-            {/* عملکرد دپارتمان‌ها */}
             <DepartmentsTable departments={adminReports.departments} />
 
-            {/* عملکرد اعضا */}
             <MembersTable members={adminReports.members} />
 
-            {/* موضوعات پرتکرار و ساعات پرترافیک */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <TopTopics topics={adminReports.topTopics} />
               <PeakHoursChart data={adminReports.peakHours} />
             </div>
 
-            {/* پیشنهادهای عملیاتی */}
             <Suggestions suggestions={adminReports.suggestions} />
 
-            {/* مودال‌های گزارشات مدیر کل */}
             <PerformanceReportModal
               isOpen={openModal === "performance"}
               onClose={() => setOpenModal(null)}
