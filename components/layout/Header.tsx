@@ -20,6 +20,7 @@ import { useRoleStore, UserRole } from "@/stores/useRoleStore";
 import { authService } from "@/services/auth.service";
 import { api } from "@/services/api-client";
 import { useNotifications } from "@/hooks/useNotifications";
+import { getFullImageUrl } from "@/services/onboardingApi";
 import Link from "next/link";
 
 interface HeaderProps {
@@ -57,6 +58,15 @@ const roleDisplayMap: Record<string, string> = {
 
 const getRolePersian = (role: string): string => {
   return roleDisplayMap[role] || role;
+};
+
+const getAvatarUrl = (fallbackName: string): string => {
+  const storedAvatar = localStorage.getItem("userAvatar");
+  if (storedAvatar) {
+    const fullUrl = getFullImageUrl(storedAvatar);
+    if (fullUrl) return fullUrl;
+  }
+  return `https://ui-avatars.com/api/?background=59D8C3&color=06110C&name=${encodeURIComponent(fallbackName)}&length=2&font-size=0.24&size=40`;
 };
 
 const getNotificationIcon = (type: string) => {
@@ -148,7 +158,7 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
               role: roleEnglish,
               roleDisplay: displayRole,
               departmentName: departmentName,
-              avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=${encodeURIComponent(finalName)}&length=2&font-size=0.24&size=40`,
+              avatar: getAvatarUrl(finalName),
             });
 
           } catch (staffError) {
@@ -158,7 +168,7 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
               role: userRole,
               roleDisplay: userRole,
               departmentName: "",
-              avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=${encodeURIComponent(userName)}&length=2&font-size=0.24&size=40`,
+              avatar: getAvatarUrl(userName),
             });
           }
         } else {
@@ -167,7 +177,7 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
             role: userRole,
             roleDisplay: userRole,
             departmentName: "",
-            avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=${encodeURIComponent(userName)}&length=2&font-size=0.24&size=40`,
+            avatar: getAvatarUrl(userName),
           });
         }
 
@@ -185,7 +195,7 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
           role: userRole,
           roleDisplay: userRole,
           departmentName: "",
-          avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=${encodeURIComponent(userName)}&length=2&font-size=0.24&size=40`,
+          avatar: getAvatarUrl(userName),
         });
       } finally {
         setIsLoading(false);
@@ -223,14 +233,14 @@ export default function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
               displayRole = `کارمند ${departmentName || ''}`.trim() || 'کارمند';
             }
             
-            setUserInfo(prev => ({
-              ...prev,
-              name: staffResponse.name || prev.name,
-              role: roleEnglish,
-              roleDisplay: displayRole,
-              departmentName: departmentName,
-              avatar: `https://ui-avatars.com/api/?background=59D8C3&color=06110F&name=${encodeURIComponent(staffResponse.name || prev.name)}&length=2&font-size=0.24&size=40`,
-            }));
+              setUserInfo(prev => ({
+                ...prev,
+                name: staffResponse.name || prev.name,
+                role: roleEnglish,
+                roleDisplay: displayRole,
+                departmentName: departmentName,
+                avatar: getAvatarUrl(staffResponse.name || prev.name),
+              }));
           } catch (error) {
             console.error('❌ خطا در به‌روزرسانی اطلاعات:', error);
           }

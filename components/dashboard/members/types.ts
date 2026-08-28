@@ -14,7 +14,7 @@ export interface Member {
   presence: "online" | "offline";
   lastActivity: string;
   openTickets: number;
-  avatar?: string;
+  avatar?: string | null;
   staffId?: number;
 }
 
@@ -34,6 +34,7 @@ export interface AgentResponse {
   venokStaff?: {
     id: number;
     name: string;
+    avatar?: string | null;
   };
   supportAgentTeams?: {
     id: number;

@@ -5,6 +5,7 @@ import { Image, Upload, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { useModal } from "@/components/ui/modal";
 import { CompanyInfo } from "./types";
 import { api } from "@/services/api-client";
+import { uploadLogo, getFullImageUrl } from "@/services/onboardingApi";
 
 interface WorkspaceCompanyTabProps {
   info: CompanyInfo;
@@ -80,7 +81,14 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
           }>('/organization/current');
         } catch (error) {
           console.warn('⚠️ خطا در دریافت organization:', error);
-          orgData = { logo: null, description: null, website: null };
+          const savedLogo = localStorage.getItem('companyLogo');
+          const savedDesc = localStorage.getItem('companyDescription');
+          const savedDomain = localStorage.getItem('companyDomain');
+          orgData = { 
+            logo: savedLogo || null, 
+            description: savedDesc || null, 
+            website: savedDomain || null 
+          };
         }
         console.log('📡 organization دریافت شد:', orgData);
         
@@ -99,8 +107,9 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
         
         // ✅ 4. تنظیم logoUrl برای نمایش
         if (orgData?.logo) {
-          setLogoUrl(orgData.logo);
-          localStorage.setItem("companyLogo", orgData.logo);
+          const fullLogoUrl = getFullImageUrl(orgData.logo);
+          setLogoUrl(fullLogoUrl);
+          localStorage.setItem("companyLogo", fullLogoUrl || '');
         }
         
         // ✅ 5. ذخیره workspaceId صحیح
@@ -124,7 +133,7 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      showWarning("حجم فایل باید کمتر از ۲ مگابایت باشد", "خطا در آپلود");
+      showWarning("حجم فایل باید کمتر از ۳ مگابایت باشد", "خطا در آپلود");
       return;
     }
 
@@ -141,24 +150,42 @@ export default function WorkspaceCompanyTab({ info, onInfoChange }: WorkspaceCom
     reader.onloadend = () => {
       setLocalLogoPreview(reader.result as string);
       setHasNewLogo(true);
-      setLogoUrl(reader.result as string);
-      
-      onInfoChange({ 
-        ...info, 
-        logo: reader.result as string,
-        logoFile: file
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      const accessToken = localStorage.getItem("accessToken") || "";
+      const contextToken =
+        localStorage.getItem("contextToken") ||
+        localStorage.getItem("x-context-token") ||
+        null;
+
+      const uploadResult = await uploadLogo(file, accessToken, contextToken);
+      const uploadedUrl = uploadResult.fullUrl;
+
+      setLogoUrl(uploadedUrl);
+      localStorage.setItem("companyLogo", uploadedUrl);
+
+      onInfoChange({
+        ...info,
+        logo: uploadedUrl,
+        logoFile: null,
       });
-      
+
       setUploading(false);
       setUploadStatus('success');
-      
+
       setTimeout(() => {
         setUploadStatus('idle');
         setHasNewLogo(false);
         setLocalLogoPreview(null);
       }, 3000);
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('❌ خطا در آپلود لوگو:', error);
+      setUploadError("خطا در آپلود لوگو. لطفاً دوباره تلاش کنید.");
+      setUploadStatus('error');
+      setUploading(false);
+    }
   };
 
   const triggerFileInput = () => {

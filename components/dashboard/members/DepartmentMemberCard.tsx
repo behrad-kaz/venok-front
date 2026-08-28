@@ -1,9 +1,11 @@
 // components/dashboard/members/DepartmentMemberCard.tsx
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Member } from "./types";
+import { getFullImageUrl } from "@/services/onboardingApi";
 
 interface DepartmentMemberCardProps {
   member: Member;
@@ -17,6 +19,9 @@ const getInitials = (firstName: string, lastName: string) => {
 export default function DepartmentMemberCard({ member, index }: DepartmentMemberCardProps) {
   const fullName = `${member.firstName} ${member.lastName}`;
   const initials = getInitials(member.firstName, member.lastName);
+  const [avatarError, setAvatarError] = useState(false);
+
+  const avatarUrl = member.avatar && !avatarError ? getFullImageUrl(member.avatar) : null;
 
   const isManager = member.role === "مدیر دپارتمان";
 
@@ -29,9 +34,18 @@ export default function DepartmentMemberCard({ member, index }: DepartmentMember
     >
       <div className="flex items-start gap-4">
         <span className="relative inline-flex flex-shrink-0">
-          <span className="rounded-full inline-flex items-center justify-center font-semibold bg-[rgba(89,216,195,0.14)] text-[#59D8C3] border border-[rgba(89,216,195,0.2)] w-11 h-11 text-sm">
-            {initials}
-          </span>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={fullName}
+              className="w-11 h-11 rounded-full object-cover border border-[rgba(89,216,195,0.2)]"
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <span className="rounded-full inline-flex items-center justify-center font-semibold bg-[rgba(89,216,195,0.14)] text-[#59D8C3] border border-[rgba(89,216,195,0.2)] w-11 h-11 text-sm">
+              {initials}
+            </span>
+          )}
           {member.presence === "online" && (
             <span className="absolute bottom-0 left-0 w-2.5 h-2.5 rounded-full border-2 border-[rgba(9,22,18,0.8)] bg-[#5be0a8]" />
           )}

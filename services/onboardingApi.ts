@@ -63,8 +63,13 @@ export interface CreateWorkspaceWithLogoDto {
 export const getFullImageUrl = (path: string | null): string | null => {
   if (!path) return null;
   
-  // اگر آدرس کامل است، همان را برگردان
+  // ✅ اگر آدرس کامل است، همان را برگردان
   if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  
+  // ✅ اگر data URL است، همان را برگردان
+  if (path.startsWith('data:')) {
     return path;
   }
   

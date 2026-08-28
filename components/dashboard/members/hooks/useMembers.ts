@@ -3,6 +3,7 @@
 // ============================================================
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Member, Department, StatsData, AgentResponse, TeamResponse } from "../types";
+import { api } from "@/services/api-client";
 import {
   fetchTeams,
   fetchAgents,
@@ -20,7 +21,7 @@ import { useModal } from "@/components/ui/modal";
 const mapAgentToMember = (
   agent: AgentResponse,
   departments: Department[],
-  staffMap: Map<number, { name: string; phone: string; staffId: number }>
+  staffMap: Map<number, { name: string; phone: string; staffId: number; avatar: string | null }>
 ): Member => {
   const staffInfo = staffMap.get(agent.id);
   const name = staffInfo?.name || agent.venokStaff?.name || `کاربر ${agent.id}`;
@@ -64,6 +65,7 @@ const mapAgentToMember = (
     presence: agent.lastOnlineAt ? 'online' : 'offline',
     lastActivity: agent.lastOnlineAt ? 'آنلاین' : 'آفلاین',
     openTickets: 0,
+     avatar: staffInfo?.avatar || agent.venokStaff?.avatar || null,
     staffId: agent.id, // ✅ مستقیماً از agent.id استفاده کن
   };
   
@@ -99,7 +101,7 @@ export function useMembers() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [staffIdMap, setStaffIdMap] = useState<Map<number, { name: string; phone: string; staffId: number }>>(new Map());
+  const [staffIdMap, setStaffIdMap] = useState<Map<number, { name: string; phone: string; staffId: number; avatar: string | null }>>(new Map());
   const [teamIdMap, setTeamIdMap] = useState<Map<string, number>>(new Map());
   const [venokStaffCounter, setVenokStaffCounter] = useState<number>(0);
   
@@ -135,16 +137,41 @@ export function useMembers() {
       const staffPromises = agents.map(async (agent) => {
         if (agent.venokStaffId) {
           const staff = await fetchStaff(agent.venokStaffId);
+          
+          let avatar = staff?.user?.avatar || agent.venokStaff?.avatar || null;
+          console.log(`📋 Avatar check for agent ${agent.id} (staffId: ${agent.venokStaffId}):`, {
+            staffUserAvatar: staff?.user?.avatar,
+            agentVenokStaffAvatar: agent.venokStaff?.avatar,
+            avatarBeforeFallback: avatar,
+            userId: staff?.userId,
+          });
+          
+          // ✅ Fallback: اگر آواتار از /staff یا /agents دریافت نشد، از /users/:userId بگیر
+          if (!avatar && staff?.userId) {
+            try {
+              const userData = await api.get<{ avatar: string | null }>(`/users/${staff.userId}`);
+              avatar = userData?.avatar || null;
+              console.log(`📥 آواتار کاربر ${staff.userId} از /users دریافت شد:`, avatar);
+            } catch (userErr) {
+              console.warn(`⚠️ خطا در دریافت آواتار کاربر ${staff.userId}:`, userErr);
+            }
+          }
+          
           return { 
             agentId: agent.id, 
-            staffInfo: staff ? { name: staff.name, phone: staff.phone || '', staffId: staff.id } : null 
+            staffInfo: staff ? { 
+              name: staff.name, 
+              phone: staff.phone || '', 
+              staffId: staff.id,
+              avatar: avatar,
+            } : null 
           };
         }
         return { agentId: agent.id, staffInfo: null };
       });
       
       const staffResults = await Promise.all(staffPromises);
-      const staffMap = new Map<number, { name: string; phone: string; staffId: number }>();
+      const staffMap = new Map<number, { name: string; phone: string; staffId: number; avatar: string | null }>();
       staffResults.forEach(({ agentId, staffInfo }) => {
         if (staffInfo) {
           staffMap.set(agentId, staffInfo);

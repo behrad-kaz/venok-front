@@ -77,6 +77,7 @@ export interface AgentResponse {
   venokStaff?: {
     id: number;
     name: string;
+    avatar?: string | null;
   };
   supportAgentTeams?: {
     id: number;
@@ -175,6 +176,7 @@ export const fetchAgents = async (): Promise<AgentResponse[]> => {
         venokStaff: {
           id: staff.id,
           name: staff.name,
+          avatar: staff.user?.avatar || null,
         },
         supportAgentTeams: supportAgentTeams,
       };

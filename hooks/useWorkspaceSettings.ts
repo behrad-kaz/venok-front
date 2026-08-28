@@ -252,7 +252,14 @@ export function useWorkspaceSettings() {
           }>('/organization/current');
         } catch (error) {
           console.warn('⚠️ خطا در دریافت organization:', error);
-          orgData = { logo: null, description: null, website: null };
+          const savedLogo = localStorage.getItem('companyLogo');
+          const savedDesc = localStorage.getItem('companyDescription');
+          const savedDomain = localStorage.getItem('companyDomain');
+          orgData = { 
+            logo: savedLogo || null, 
+            description: savedDesc || null, 
+            website: savedDomain || null 
+          };
         }
         console.log('📡 organization دریافت شد:', orgData);
 

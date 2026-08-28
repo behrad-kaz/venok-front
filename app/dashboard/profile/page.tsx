@@ -61,8 +61,23 @@ export default function ProfilePage() {
         const userPhone = localStorage.getItem("userPhone") || "";
         const userEmail = localStorage.getItem("userEmail") || localStorage.getItem("supportEmail") || "";
         const userRole = localStorage.getItem("userRole") || "کاربر";
-        const userDepartment = localStorage.getItem("userDepartment") || "";
+         const userDepartment = localStorage.getItem("userDepartment") || "";
+        const userAvatar = localStorage.getItem("userAvatar") || null;
         const userId = getUserId();
+
+        // ✅ سعی کن از API آواتار کاربر بگیری
+        let avatar = userAvatar;
+        if (userId) {
+          try {
+            const userData = await api.get<{ avatar: string | null }>(`/users/${userId}`);
+            avatar = userData?.avatar || userAvatar;
+            if (userData?.avatar) {
+              localStorage.setItem("userAvatar", userData.avatar);
+            }
+          } catch (userErr) {
+            console.error("❌ خطا در دریافت اطلاعات کاربر:", userErr);
+          }
+        }
 
         const fullName = `${firstName} ${lastName}`.trim() || userName;
 
@@ -126,7 +141,7 @@ export default function ProfilePage() {
           status: "active",
           lastOnlineAt: new Date().toISOString(),
           createdAt: new Date().toISOString(),
-          avatar: null,
+          avatar: avatar,
           stats: {
             totalConversations: conversations.length,
             answeredConversations: answered,
@@ -273,7 +288,7 @@ export default function ProfilePage() {
       });
 
       setProfile(prev => prev ? { ...prev, avatar: avatarPath } : null);
-      
+      localStorage.setItem("userAvatar", avatarPath);
       setShowSuccessModal(true);
     } catch (err) {
       console.error("❌ خطا در آپلود عکس:", err);
@@ -404,14 +419,16 @@ export default function ProfilePage() {
               <h1 className="text-2xl font-bold text-white mb-1">{profile.name}</h1>
               <p className="text-sm text-[#59D8C3] mb-2">{getRoleLabel(profile.role)}</p>
               <div className="flex items-center gap-4 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border" style={{
-                  backgroundColor: `${profile.departmentColor}15`,
-                  color: profile.departmentColor,
-                  borderColor: `${profile.departmentColor}40`,
-                }}>
-                  <Building2 className="w-3 h-3" />
-                  {profile.departmentName}
-                </span>
+                {profile.departmentName && profile.departmentName !== "بدون دپارتمان" && profile.role !== "admin" && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border" style={{
+                    backgroundColor: `${profile.departmentColor}15`,
+                    color: profile.departmentColor,
+                    borderColor: `${profile.departmentColor}40`,
+                  }}>
+                    <Building2 className="w-3 h-3" />
+                    {profile.departmentName}
+                  </span>
+                )}
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${
                   profile.status === "active"
                     ? "bg-[rgba(91,224,168,0.12)] text-[#5be0a8] border-[rgba(91,224,168,0.28)]"
@@ -522,13 +539,15 @@ export default function ProfilePage() {
               </div>
               <span className="text-sm text-white font-medium">{getRoleLabel(profile.role)}</span>
             </div>
-            <div className="flex items-center justify-between py-3 border-b border-[rgba(255,255,255,0.05)]">
-              <div className="flex items-center gap-3">
-                <Building2 className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-400">دپارتمان</span>
-              </div>
-              <span className="text-sm text-white font-medium">{profile.departmentName}</span>
-            </div>
+               <div className="flex items-center justify-between py-3 border-b border-[rgba(255,255,255,0.05)]">
+                 <div className="flex items-center gap-3">
+                   <Building2 className="w-4 h-4 text-gray-500" />
+                   <span className="text-sm text-gray-400">دپارتمان</span>
+                 </div>
+                 <span className="text-sm text-white font-medium">
+                   {profile.role === "admin" ? "مدیر کل" : profile.departmentName}
+                 </span>
+               </div>
             <div className="flex items-center justify-between py-3">
               <div className="flex items-center gap-3">
                 <Clock className="w-4 h-4 text-gray-500" />
