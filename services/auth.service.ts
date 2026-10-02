@@ -111,9 +111,12 @@ class AuthService {
 
     console.log('✅ نقش تعیین شده:', { role, rolePersian });
 
-    // ساخت Organization و Workspace پیش‌فرض
-    const defaultOrganization: OrganizationModel = {
-      id: 1,
+    // ✅ سازمان فقط به‌عنوان placeholder ساخته می‌شود.
+    // اطلاعات واقعی سازمان و workspaceها بعد از لاگین از API خوانده می‌شود
+    // (hydrateContext). عمداً هیچ workspace جعلی ساخته نمی‌شود تا مشخص شود
+    // کاربر workspace دارد یا باید onboarding را طی کند.
+    const placeholderOrganization: OrganizationModel = {
+      id: response.user.organizationId || 0,
       ownerUserId: response.user.id,
       name: response.user.firstName || 'سازمان',
       legalName: response.user.firstName || 'سازمان',
@@ -134,29 +137,6 @@ class AuthService {
       deletedAt: null,
       workspaces: [],
     };
-
-    const defaultWorkspace: WorkspaceModel = {
-      id: 1,
-      organizationId: 1,
-      managerStaffId: response.user.id,
-      name: 'فضای کاری اصلی',
-      code: 'MAIN',
-      slug: 'main',
-      status: 'active',
-      phone: response.user.mobile || null,
-      email: response.user.email,
-      address: null,
-      city: null,
-      postalCode: null,
-      latitude: null,
-      longitude: null,
-      timezone: 'Asia/Tehran',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      deletedAt: null,
-    };
-
-    defaultOrganization.workspaces = [defaultWorkspace];
 
     const loginResponse: LoginResponseModel = {
       token: {
@@ -179,7 +159,7 @@ class AuthService {
         deletedAt: null,
         role: rolePersian,
       },
-      organizations: [defaultOrganization],
+      organizations: [placeholderOrganization],
     };
 
     // ✅ ذخیره اطلاعات staff برای استفاده بعدی
@@ -191,6 +171,65 @@ class AuthService {
     (loginResponse as any).lastName = response.user.lastName;
 
     return loginResponse;
+  }
+
+  // ✅ خواندن سازمان و workspaceهای واقعی از API و همگام‌سازی با localStorage
+  // باید بعد از storeUserData صدا زده شود تا توکن در دسترس باشد.
+  async hydrateContext(): Promise<{ hasWorkspace: boolean }> {
+    if (typeof window === 'undefined') return { hasWorkspace: false };
+
+    const placeholder = this.getOrganizations()?.[0] ?? null;
+
+    let organization: OrganizationModel | null = null;
+    try {
+      organization = await api.get<OrganizationModel>('/organization/by-user');
+    } catch (error) {
+      console.warn('⚠️ دریافت سازمان کاربر ناموفق بود:', error);
+    }
+
+    // فقط workspaceهای فعال و حذف‌نشده ملاک هستند
+    const workspaces = (organization?.workspaces ?? []).filter(
+      (ws) => ws && !ws.deletedAt && (!ws.status || ws.status === 'active')
+    );
+
+    const finalOrganization: OrganizationModel = {
+      ...(placeholder ?? ({} as OrganizationModel)),
+      ...(organization ?? {}),
+      workspaces,
+    };
+
+    if (!finalOrganization.id) {
+      console.warn('⚠️ سازمانی برای این کاربر یافت نشد');
+      return { hasWorkspace: false };
+    }
+
+    const defaultWorkspace = workspaces[0] ?? null;
+    const hasWorkspace = !!defaultWorkspace;
+
+    localStorage.setItem('organizations', JSON.stringify([finalOrganization]));
+    localStorage.setItem('currentOrganization', JSON.stringify(finalOrganization));
+    localStorage.setItem('currentOrganizationId', String(finalOrganization.id));
+    document.cookie = `organizationId=${finalOrganization.id}; path=/; max-age=${60 * 60 * 24 * 7}`;
+
+    if (hasWorkspace && defaultWorkspace) {
+      localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
+      localStorage.setItem('currentWorkspaceId', String(defaultWorkspace.id));
+      document.cookie = `workspaceId=${defaultWorkspace.id}; path=/; max-age=${60 * 60 * 24 * 7}`;
+    } else {
+      ['currentWorkspace', 'currentWorkspaceId', 'workspaceSlug'].forEach((key) =>
+        localStorage.removeItem(key)
+      );
+      document.cookie = `workspaceId=; path=/; max-age=0`;
+    }
+
+    localStorage.setItem('hasSeenOnboarding', String(hasWorkspace));
+    document.cookie = `hasSeenOnboarding=${hasWorkspace}; path=/; max-age=${60 * 60 * 24 * 7}`;
+
+    console.log(
+      `✅ hydrateContext - سازمان: ${finalOrganization.id} | workspace ها: ${workspaces.length}`
+    );
+
+    return { hasWorkspace };
   }
 
   // دریافت workspace و organization پیش‌فرض
@@ -257,10 +296,11 @@ class AuthService {
 
     const defaultOrganization = organizations[0];
     const defaultWorkspace = defaultOrganization?.workspaces?.[0];
+    const hasWorkspace = !!defaultWorkspace;
 
     const storedData: StoredUserData = {
       isLoggedIn: true,
-      hasSeenOnboarding: true,
+      hasSeenOnboarding: hasWorkspace,
       userRole: rolePersian,
       userRoleEnglish: role,
       userName: user.phone || username,
@@ -288,7 +328,9 @@ class AuthService {
     localStorage.setItem('refreshToken', token.refreshToken);
     localStorage.setItem('organizations', JSON.stringify(organizations));
     localStorage.setItem('currentOrganization', JSON.stringify(defaultOrganization));
-    localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
+    if (defaultWorkspace) {
+      localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
+    }
 
     // ✅ ذخیره staffId و staffRole جداگانه
     if (staffId) {
@@ -307,7 +349,7 @@ class AuthService {
     const maxAge = 60 * 60 * 24 * 7;
     document.cookie = `isLoggedIn=true; path=/; max-age=${maxAge}`;
     document.cookie = `userRole=${role}; path=/; max-age=${maxAge}`;
-    document.cookie = `hasSeenOnboarding=true; path=/; max-age=${maxAge}`;
+    document.cookie = `hasSeenOnboarding=${hasWorkspace}; path=/; max-age=${maxAge}`;
     document.cookie = `accessToken=${token.accessToken}; path=/; max-age=${maxAge}`;
     document.cookie = `userId=${user.id}; path=/; max-age=${maxAge}`;
     document.cookie = `userPhone=${user.phone}; path=/; max-age=${maxAge}`;
@@ -344,41 +386,12 @@ class AuthService {
       const storedData = this.storeUserData(loginResponse, username);
       console.log("✅ مرحله 2: اطلاعات ذخیره شد - نقش:", storedData.userRole);
 
-      const defaultContext = this.getDefaultContext();
+      const { hasWorkspace } = await this.hydrateContext();
+      console.log("✅ مرحله 3: workspace ها از سرور خوانده شد - hasWorkspace:", hasWorkspace);
 
-      if (!defaultContext) {
-        return {
-          success: false,
-          hasWorkspace: false,
-          redirectPath: "/onboarding/workspace",
-          error: "اطلاعات سازمان یافت نشد"
-        };
-      }
-
-      console.log("✅ مرحله 3: context پیش‌فرض:", defaultContext);
-
-      try {
-        const switchResult = await this.switchContext(defaultContext.organizationId, defaultContext.workspaceId || undefined);
-        console.log("✅ مرحله 4: سوییچ context موفق");
-
-        if (switchResult?.contextToken) {
-          localStorage.setItem("contextToken", switchResult.contextToken);
-          localStorage.setItem("x-context-token", switchResult.contextToken);
-          document.cookie = `contextToken=${switchResult.contextToken}; path=/; max-age=${60 * 60 * 24 * 7}`;
-        }
-
-        if (switchResult?.access_token) {
-          localStorage.setItem("accessToken", switchResult.access_token);
-          localStorage.setItem("userToken", switchResult.access_token);
-        }
-      } catch (switchError) {
-        console.warn("⚠️ سوییچ context با خطا مواجه شد:", switchError);
-      }
-
-      const hasWorkspace = !!defaultContext.workspaceId;
       const redirectPath = hasWorkspace ? "/dashboard" : "/onboarding/workspace";
 
-      console.log(`✅ مرحله 5: مسیر نهایی ${redirectPath} - نقش: ${storedData.userRole}`);
+      console.log(`✅ مرحله 4: مسیر نهایی ${redirectPath} - نقش: ${storedData.userRole}`);
 
       return {
         success: true,

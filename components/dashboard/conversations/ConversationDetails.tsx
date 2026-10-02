@@ -128,14 +128,12 @@ export default function ConversationDetails({
             )}
             <h3 className="text-sm font-bold text-white">جزئیات گفتگو</h3>
           </div>
-          {!showBackButton && (
-            <button
-              onClick={onClose}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.04)] transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-white hover:bg-[rgba(255,255,255,0.04)] transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         <div className="space-y-4">

@@ -51,9 +51,6 @@ export interface CreateWorkspaceWithLogoDto {
   slug: string;
   phone?: string;
   email?: string;
-  address?: string;
-  city?: string;
-  postalCode?: string;
   timezone?: string;
   locale?: string;
   logo?: string;
@@ -94,9 +91,6 @@ export const createWorkspace = async (
     slug: data.slug,
     phone: data.phone || "",
     email: data.email || "",
-    address: data.address || "",
-    city: data.city || "",
-    postalCode: data.postalCode || "",
     timezone: data.timezone || "Asia/Tehran",
     locale: data.locale || "fa-IR",
     logo: data.logo || "",
@@ -149,7 +143,7 @@ export const updateWorkspace = async (
     slug: data.slug,
     phone: data.phone || "",
     email: data.email || "",
-    logo: data.logo || "",
+    ...(data.logo ? { logo: data.logo } : {}),
     supportPhone: data.supportPhone || "",
     supportEmail: data.supportEmail || "",
     alertPhone: data.alertPhone || "",
@@ -377,10 +371,12 @@ export const saveWorkspaceToStorage = (workspaceData: WorkspaceData) => {
   localStorage.setItem("currentWorkspace", JSON.stringify(workspaceData));
   localStorage.setItem("currentWorkspaceId", String(workspaceData.id));
   localStorage.setItem("workspaceSlug", workspaceData.slug);
+  localStorage.setItem("hasSeenOnboarding", "true");
 
   if (typeof document !== "undefined") {
     const maxAge = 7 * 24 * 60 * 60;
     document.cookie = `workspaceId=${workspaceData.id}; path=/; max-age=${maxAge}`;
     document.cookie = `workspaceSlug=${workspaceData.slug}; path=/; max-age=${maxAge}`;
+    document.cookie = `hasSeenOnboarding=true; path=/; max-age=${maxAge}`;
   }
 };

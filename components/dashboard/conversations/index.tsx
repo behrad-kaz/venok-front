@@ -833,6 +833,7 @@ export default function ConversationsContainer() {
     return () => window.removeEventListener("resize", checkLayout);
   }, []);
 
+  // ✅ بازگشت از chat به list (فقط در موبایل/تبلت)
   const handleBackToList = useCallback(() => {
     if (layoutMode === "mobile" || layoutMode === "tablet") {
       setViewMode("list");
@@ -840,12 +841,30 @@ export default function ConversationsContainer() {
     }
   }, [layoutMode]);
 
+  // ✅ بازگشت از details به chat (فقط در موبایل/تبلت)
   const handleBackToChat = useCallback(() => {
-    if ((layoutMode === "mobile" || layoutMode === "tablet") && showDetails) {
-      setShowDetails(false);
+    if (layoutMode === "mobile" || layoutMode === "tablet") {
       setViewMode("chat");
+      setShowDetails(false);
+    } else {
+      setShowDetails(false);
     }
-  }, [layoutMode, showDetails]);
+  }, [layoutMode]);
+
+  // ✅ تابع هوشمند toggle جزئیات
+  // در دسکتاپ: فقط showDetails را toggle می‌کند
+  // در موبایل/تبلت: بین viewMode های chat و details جابجا می‌شود
+  const handleToggleDetails = useCallback(() => {
+    if (layoutMode === "mobile" || layoutMode === "tablet") {
+      if (viewMode === "chat") {
+        setViewMode("details");
+      } else if (viewMode === "details") {
+        setViewMode("chat");
+      }
+    } else {
+      setShowDetails((prev) => !prev);
+    }
+  }, [layoutMode, viewMode]);
 
   if (isLoading && conversations.length === 0) {
     return (
@@ -856,6 +875,7 @@ export default function ConversationsContainer() {
     );
   }
 
+  // ========== دسکتاپ ==========
   if (layoutMode === "desktop") {
     return (
       <div className="flex h-[calc(100vh-120px)] gap-4 ">
@@ -892,7 +912,7 @@ export default function ConversationsContainer() {
               showDetails={showDetails}
               onNewMessageChange={setNewMessage}
               onSendMessage={handleSendMessage}
-              onToggleDetails={() => setShowDetails(!showDetails)}
+              onToggleDetails={handleToggleDetails}
               onBack={handleBackToList}
               isMobile={false}
               role={role}
@@ -944,6 +964,7 @@ export default function ConversationsContainer() {
     );
   }
 
+  // ========== تبلت ==========
   if (layoutMode === "tablet") {
     return (
       <div className="flex h-[calc(100vh-120px)] gap-4">
@@ -979,7 +1000,7 @@ export default function ConversationsContainer() {
               showDetails={false}
               onNewMessageChange={setNewMessage}
               onSendMessage={handleSendMessage}
-              onToggleDetails={() => setShowDetails(!showDetails)}
+              onToggleDetails={handleToggleDetails}
               onBack={handleBackToList}
               isMobile={false}
               isTablet={true}
@@ -999,7 +1020,7 @@ export default function ConversationsContainer() {
           {viewMode === "details" && selectedConversation && (
             <ConversationDetails
               conversation={selectedConversation}
-              onClose={() => setShowDetails(false)}
+              onClose={handleBackToChat}
               onChangeStatus={() =>
                 handleChangeStatus(
                   selectedConversation.status === "closed" ? "open" : "closed",
@@ -1032,6 +1053,7 @@ export default function ConversationsContainer() {
     );
   }
 
+  // ========== موبایل ==========
   return (
     <div className="h-[calc(100vh-120px)]">
       {viewMode === "list" && (
@@ -1065,7 +1087,7 @@ export default function ConversationsContainer() {
           showDetails={false}
           onNewMessageChange={setNewMessage}
           onSendMessage={handleSendMessage}
-          onToggleDetails={() => setShowDetails(!showDetails)}
+          onToggleDetails={handleToggleDetails}
           onBack={handleBackToList}
           isMobile={true}
           role={role}
@@ -1084,7 +1106,7 @@ export default function ConversationsContainer() {
       {viewMode === "details" && selectedConversation && (
         <ConversationDetails
           conversation={selectedConversation}
-          onClose={() => setShowDetails(false)}
+          onClose={handleBackToChat}
           onChangeStatus={() =>
             handleChangeStatus(
               selectedConversation.status === "closed" ? "open" : "closed",

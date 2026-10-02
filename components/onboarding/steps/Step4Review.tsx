@@ -36,13 +36,19 @@ export default function Step4Review({
   const totalMembers = members?.length || 0;
   const managersCount = members?.filter(m => m.role === "manager").length || 0;
 
-  const handleGoToDashboard = () => {
+  const finishOnboarding = () => {
     localStorage.setItem("workspaceCompleted", "true");
+    localStorage.setItem("hasSeenOnboarding", "true");
+    document.cookie = `hasSeenOnboarding=true; path=/; max-age=${60 * 60 * 24 * 7}`;
+  };
+
+  const handleGoToDashboard = () => {
+    finishOnboarding();
     window.location.href = "/dashboard";
   };
 
   const handleGoToWidgetSettings = () => {
-    localStorage.setItem("workspaceCompleted", "true");
+    finishOnboarding();
     window.location.href = "/dashboard/settings";
   };
 

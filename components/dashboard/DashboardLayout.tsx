@@ -367,7 +367,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         initial={false}
         animate={{ width: isSidebarCollapsed ? "80px" : "280px" }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="fixed right-0 top-0 h-screen z-50 bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border-l border-[rgba(255,255,255,0.1)] hidden md:flex flex-col shadow-2xl"
+        className="fixed right-0 top-0 h-screen z-50 bg-[rgba(9,22,18,0.98)] backdrop-blur-xl border-l border-[rgba(255,255,255,0.1)] hidden lg:flex flex-col shadow-2xl"
       >
         <SidebarContent
           isSidebarCollapsed={isSidebarCollapsed}
@@ -381,7 +381,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         />
       </motion.aside>
 
-      <div className={`transition-all duration-300 ${isSidebarCollapsed ? "md:mr-[80px]" : "md:mr-[280px]"}`}>
+      <div className={`transition-all duration-300 ${isSidebarCollapsed ? "lg:mr-[80px]" : "lg:mr-[280px]"}`}>
         <Header onMenuClick={() => setIsMobileMenuOpen(true)} isMobileMenuOpen={isMobileMenuOpen} />
         <main className="overflow-auto min-h-screen">
           <div className="p-6">{children}</div>

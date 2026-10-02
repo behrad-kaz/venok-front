@@ -103,7 +103,7 @@ export function useOnboarding() {
         
         if (workspaceData) {
           // ✅ استفاده از getFullImageUrl برای دریافت آدرس کامل لوگو
-          const fullLogoUrl = getFullImageUrl(workspaceData.logo);
+          const fullLogoUrl = getFullImageUrl(workspaceData.logo ?? null);
           
           setCompanyInfo({
             name: workspaceData.name || '',
@@ -175,8 +175,9 @@ export function useOnboarding() {
         orgData = await api.get<{ id: number }>('/organization/by-user');
         console.log('📡 organization موجود:', orgData);
       } catch (orgError) {
-        console.error('❌ سازمانی برای این کاربر یافت نشد!');
-        throw new Error('سازمانی برای این کاربر یافت نشد. لطفاً با ادمین اصلی تماس بگیرید.');
+        const reason = orgError instanceof Error ? orgError.message : String(orgError);
+        console.error('❌ سازمانی برای این کاربر یافت نشد! جزئیات:', reason);
+        throw new Error(`سازمانی برای این کاربر یافت نشد (${reason}).`);
       }
 
       if (!orgData || !orgData.id) {
@@ -277,9 +278,6 @@ export function useOnboarding() {
           email: companyInfo.email || '',
           slug,
           code,
-          address: '',
-          city: '',
-          postalCode: '',
           timezone: 'Asia/Tehran',
           locale: 'fa-IR',
           logo: logoFilePath,

@@ -1,28 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { CheckCircle } from "lucide-react";
+import { authService } from "@/services/auth.service";
 
 export default function OnboardingSuccessPage() {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(true);
+  const hasRun = useRef(false);
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+    if (hasRun.current) return;
+    hasRun.current = true;
 
-    if (!isLoggedIn) {
-      router.replace("/login");
-      return;
-    }
+    const run = async () => {
+      const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
-    // ✅ تغییر مهم: همه کاربران به یک صفحه واحد هدایت می‌شوند
-    // خود DashboardLayout مسئول نمایش منوی مناسب بر اساس نقش است
-    const timer = setTimeout(() => {
+      if (!isLoggedIn) {
+        router.replace("/login");
+        return;
+      }
+
+      // سازمان و workspaceهای واقعی از API خوانده می‌شوند
+      const { hasWorkspace } = await authService.hydrateContext();
+
+      // کاربری که هنوز workspace ندارد باید onboarding را طی کند
+      const redirectPath = hasWorkspace ? "/dashboard" : "/onboarding/workspace";
+
       setIsProcessing(false);
-      router.replace("/dashboard"); 
-    }, 1500);
+      router.replace(redirectPath);
+    };
+
+    const timer = setTimeout(run, 500);
 
     return () => clearTimeout(timer);
   }, [router]);
